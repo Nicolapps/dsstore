@@ -13,4 +13,10 @@ sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 12.0;/IPHONEOS_DEPLOYMENT_TARGET = 15.
 sed -i '' 's/Config::FirmwareUsername = "Delta";/Config::FirmwareUsername = "Nicolas";/' \
     Vendor/MelonDSDeltaCore/MelonDSDeltaCore/Bridge/MelonDSEmulatorBridge.mm
 
+# MelonDSDeltaCore caches the microphone converter across game starts, so if the input format changes
+# (e.g. screen recording or a new audio route), connecting the new engine throws and crashes the app.
+grep -q '_audioConverter = nil;' Vendor/MelonDSDeltaCore/MelonDSDeltaCore/Bridge/MelonDSEmulatorBridge.mm ||
+    perl -0pi -e 's/(- \(void\)prepareAudioEngine\n\{\n    self\.audioEngine = \[\[AVAudioEngine alloc\] init\];\n)/$1\n    \/\/ Recreate the converter from the new engine\x27s input format, which may have changed since the last start.\n    _audioConverter = nil;\n\n/' \
+        Vendor/MelonDSDeltaCore/MelonDSDeltaCore/Bridge/MelonDSEmulatorBridge.mm
+
 xcodegen generate
