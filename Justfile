@@ -45,10 +45,10 @@ run: build boot
     xcrun simctl install "$(just simulator='{{ simulator }}' _udid)" {{ app }}
     xcrun simctl launch --console-pty --terminate-running-process "$(just simulator='{{ simulator }}' _udid)" {{ bundle_id }}
 
-# Boot the simulator and bring the Simulator app to the front.
+# Boot the simulator and bring Device Hub (which replaces Simulator.app in Xcode 27) to the front.
 boot:
     xcrun simctl boot "$(just simulator='{{ simulator }}' _udid)" 2>/dev/null || true
-    open -a "$DEVELOPER_DIR/Applications/Simulator.app"
+    open -a '{{ xcode }}/Contents/Applications/DeviceHub.app'
 
 # Uninstall the app from the simulator (also clears its save data).
 uninstall:
