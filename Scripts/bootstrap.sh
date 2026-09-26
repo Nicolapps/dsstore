@@ -9,4 +9,8 @@ git submodule update --init --recursive
 sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 12.0;/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/' \
     Vendor/DeltaCore/External/ZIPFoundation/ZIPFoundation.xcodeproj/project.pbxproj
 
+# Games read the player's nickname from the firmware, which MelonDSDeltaCore sets to "Delta".
+sed -i '' 's/Config::FirmwareUsername = "Delta";/Config::FirmwareUsername = "Nicolas";/' \
+    Vendor/MelonDSDeltaCore/MelonDSDeltaCore/Bridge/MelonDSEmulatorBridge.mm
+
 xcodegen generate
