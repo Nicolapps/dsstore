@@ -326,7 +326,11 @@ private struct InsertionStage: View, Animatable {
                 DragGesture(minimumDistance: 4, coordinateSpace: .named(Self.space))
                     .onChanged { onPull($0.translation.width) }
                     .onEnded { value in
-                        onRelease(-value.translation.width > layout.cardLength * 0.3 || value.velocity.width < -500)
+                        // Generous, so that any deliberate tug or flick out counts: pulled a fifth of the way,
+                        // moving out at all briskly, or heading out of the slot if the finger carried on.
+                        onRelease(-value.translation.width > layout.cardLength * 0.2
+                                  || value.velocity.width < -250
+                                  || -value.predictedEndTranslation.width > layout.cardLength * 0.5)
                     },
                 isEnabled: canPull
             )
