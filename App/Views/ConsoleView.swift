@@ -92,7 +92,9 @@ private final class PhysicalConsoleController: UIViewController {
 
         console.view.bounds = CGRect(origin: .zero, size: physicalBounds.size)
         console.view.center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
-        console.view.transform = CGAffineTransform(rotationAngle: angle)
+        // Hold the device upside down relative to its fixed portrait orientation, so
+        // the top screen sits on the physical half that is at the bottom in portrait.
+        console.view.transform = CGAffineTransform(rotationAngle: angle + .pi)
     }
 }
 
