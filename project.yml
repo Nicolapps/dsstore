@@ -1,7 +1,7 @@
 name: DSStore
 
 options:
-  bundleIdPrefix: com.nicolasettlin
+  bundleIdPrefix: dev.ettlin.nicolas
   deploymentTarget:
     iOS: "17.0"
   createIntermediateGroups: true
@@ -47,7 +47,7 @@ targets:
         NSMicrophoneUsageDescription: Some games ask you to blow or speak into the microphone.
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.nicolasettlin.dsstore
+        PRODUCT_BUNDLE_IDENTIFIER: dev.ettlin.nicolas.dsstore
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
         SWIFT_APPROACHABLE_CONCURRENCY: YES

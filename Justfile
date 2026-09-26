@@ -2,12 +2,12 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 
 project := "DSStore.xcodeproj"
 scheme := "DSStore"
-bundle_id := "com.nicolasettlin.dsstore"
+bundle_id := "dev.ettlin.nicolas.dsstore"
 derived_data := "build/DerivedData"
 app := derived_data / "Build/Products/Debug-iphonesimulator/DSStore.app"
 
-# This project only builds with the Xcode 27.1 beta, regardless of `xcode-select`.
-xcode := "/Applications/Xcode 27.1.app"
+# This project needs Xcode 27.1, regardless of `xcode-select`; set XCODE_PATH if it lives elsewhere.
+xcode := env_var_or_default("XCODE_PATH", "/Applications/Xcode 27.1.app")
 export DEVELOPER_DIR := xcode / "Contents/Developer"
 
 # Simulator to build for and run on; override with `just simulator="iPhone 18 Pro" run`.
