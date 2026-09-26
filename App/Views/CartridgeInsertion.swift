@@ -323,7 +323,7 @@ private struct OpeningCase: View {
                 ZStack {
                     GameCase(game: game, scale: 1)
                         .opacity(openness < 0.5 ? 1 : 0)
-                    CoverInside(game: game)
+                    CoverInside()
                         .scaleEffect(x: -1)
                         .opacity(openness < 0.5 ? 0 : 1)
                 }
@@ -387,11 +387,8 @@ private struct CaseTray: View {
     }
 }
 
-/// The inside of the cover: the manual, held in by clips. Its spine is on the right,
-/// since that's where it meets the tray once open.
+/// The inside of the cover: bare plastic. Its spine is on the right, since that's where it meets the tray once open.
 private struct CoverInside: View {
-    let game: DisplayGame
-
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 2).fill(casePlastic)
@@ -402,32 +399,8 @@ private struct CoverInside: View {
                 Spacer()
                 Rectangle().fill(.black.opacity(0.35)).frame(width: 5)
             }
-            Image(game.id)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .padding(2)
-                .background(Color(white: 0.95))
-                .frame(width: 118)
-                .shadow(color: .black.opacity(0.5), radius: 1.5, y: 1)
-                .overlay(alignment: .leading) {
-                    VStack {
-                        clip
-                        Spacer()
-                        clip
-                    }
-                    .padding(.vertical, 14)
-                    .offset(x: -3)
-                }
-                .offset(x: -2)
         }
         .frame(width: CaseMetrics.width, height: CaseMetrics.height)
-    }
-
-    private var clip: some View {
-        RoundedRectangle(cornerRadius: 1.5)
-            .fill(LinearGradient(colors: [Color(white: 0.34), Color(white: 0.18)], startPoint: .leading, endPoint: .trailing))
-            .frame(width: 7, height: 14)
-            .shadow(color: .black.opacity(0.4), radius: 1, x: 1)
     }
 }
 
