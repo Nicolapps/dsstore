@@ -1,0 +1,6 @@
+[submodule "Vendor/DeltaCore"]
+	path = Vendor/DeltaCore
+	url = https://github.com/rileytestut/DeltaCore
+[submodule "Vendor/MelonDSDeltaCore"]
+	path = Vendor/MelonDSDeltaCore
+	url = https://github.com/rileytestut/MelonDSDeltaCore
