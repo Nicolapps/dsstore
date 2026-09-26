@@ -1,5 +1,5 @@
-Put the game the app should boot here as `game.nds`, or as `game.zip` containing a single `.nds`. Symlinks work:
+Put each game the store sells here as `<id>.nds`, or as `<id>.zip` containing a single `.nds`, where `<id>` matches a `DisplayGame` in `App/Views/GameSelectionView.swift`. Symlinks work:
 
-    ln -s /path/to/your/game.nds ROM/game.nds
+    just rom kart /path/to/Mario\ Kart\ DS.zip
 
-The game is copied into the app bundle at build time. Everything in this folder except this README is ignored by git: never commit ROMs.
+The games are copied into the app bundle at build time. Everything in this folder except this README is ignored by git: never commit ROMs.

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A miniature retail display. Choosing a game lifts its case off the shelf, ready to play.
+/// A miniature retail display. Choosing a game takes its case off the shelf and puts its card in a console, ready to play.
 struct GameSelectionView: View {
     /// The lifted game, owned by the caller so it stays lifted while the device is open.
     @Binding var selection: String?
@@ -15,13 +15,17 @@ struct GameSelectionView: View {
             let scale = geometry.size.width / 414
             cabinet(scale: scale)
                 // Keep the frame below the Duo camera, including configurations that report no top inset.
+                .padding(.horizontal, 8 * scale)
+                .padding(.bottom, 8 * scale)
                 .padding(.top, max(16, 80 - geometry.safeAreaInsets.top))
                 .frame(width: geometry.size.width, height: geometry.size.height)
+                // The overlay shares this space's origin, so slot frames measured in it need no converting.
+                .coordinateSpace(.named(StoreSpace.name))
                 .overlay {
                     if let game = DisplayGame.all.first(where: { $0.id == selection }) {
-                        LiftedCase(game: game, caseWidth: 150 * scale, liftsIn: liftsIn,
-                                   slotFrame: { slotFrames.frames[game.id] },
-                                   onPutBack: { selection = nil })
+                        CartridgeInsertion(game: game, caseWidth: 150 * scale, liftsIn: liftsIn,
+                                           slotFrame: { slotFrames.frames[game.id] },
+                                           onPutBack: { selection = nil })
                     }
                 }
         }
@@ -31,7 +35,7 @@ struct GameSelectionView: View {
         .preferredColorScheme(.light)
         .alert(item: $unavailableGame) { game in
             Alert(title: Text("\(game.title) isn’t available yet"),
-                  message: Text("Only Mario Kart DS is currently included. Choose its case to play."),
+                  message: Text("Its ROM wasn’t bundled into this build. Put it in ROM/\(game.id).zip and rebuild."),
                   dismissButton: .default(Text("OK")))
         }
     }
@@ -44,7 +48,7 @@ struct GameSelectionView: View {
                     ForEach(0..<((DisplayGame.all.count + 1) / 2), id: \.self) { row in
                         GameShelf(games: Array(DisplayGame.all.dropFirst(row * 2).prefix(2)), scale: s,
                                   liftedGame: selection, slotFrames: slotFrames) { game in
-                            if game.id == "kart" {
+                            if game.isBundled {
                                 liftsIn = true
                                 selection = game.id
                             } else {
@@ -74,23 +78,45 @@ struct GameSelectionView: View {
             }
 
         }
-        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 45 * s, bottomLeadingRadius: 3 * s, bottomTrailingRadius: 3 * s, topTrailingRadius: 45 * s))
-        .padding(12 * s)
-        .background {
-            UnevenRoundedRectangle(topLeadingRadius: 58 * s, bottomLeadingRadius: 8 * s, bottomTrailingRadius: 8 * s, topTrailingRadius: 58 * s)
-                .fill(LinearGradient(stops: [
-                    .init(color: Color(red: 1, green: 0.22, blue: 0.13), location: 0),
-                    .init(color: Color(red: 0.79, green: 0.035, blue: 0.015), location: 0.3),
-                    .init(color: Color(red: 0.95, green: 0.075, blue: 0.025), location: 0.65),
-                    .init(color: Color(red: 0.57, green: 0.025, blue: 0.015), location: 1)
-                ], startPoint: .topLeading, endPoint: .bottomTrailing))
-                .overlay {
-                    UnevenRoundedRectangle(topLeadingRadius: 57 * s, bottomLeadingRadius: 8 * s, bottomTrailingRadius: 8 * s, topTrailingRadius: 57 * s)
-                        .strokeBorder(.white.opacity(0.35), lineWidth: s)
-                        .padding(s)
-                }
-                .shadow(color: .black.opacity(0.65), radius: 12 * s, x: 6 * s, y: 14 * s)
+        .clipShape(ConcentricRectangle(corners: .concentric(minimum: .fixed(32 * s)), isUniform: true))
+        .overlay {
+            ConcentricRectangle(corners: .concentric(minimum: .fixed(32 * s)), isUniform: true)
+                .stroke(.black.opacity(0.28), lineWidth: 1.5 * s)
+                .allowsHitTesting(false)
         }
+        .padding(11 * s)
+        .background { CabinetFrame(scale: s) }
+
+    }
+}
+
+/// Molded red ABS: a dark seam, a polished bevel, and a quieter satin face.
+private struct CabinetFrame: View {
+    let scale: CGFloat
+    private var contour: ConcentricRectangle {
+        ConcentricRectangle(corners: .concentric(minimum: .fixed(43 * scale)), isUniform: true)
+    }
+
+    var body: some View {
+        ZStack {
+            contour.fill(Color(red: 0.34, green: 0.025, blue: 0.018))
+            contour.fill(LinearGradient(stops: [
+                .init(color: Color(red: 1, green: 0.27, blue: 0.20), location: 0),
+                .init(color: Color(red: 0.87, green: 0.045, blue: 0.025), location: 0.25),
+                .init(color: Color(red: 0.72, green: 0.025, blue: 0.016), location: 0.8),
+                .init(color: Color(red: 0.48, green: 0.02, blue: 0.015), location: 1)
+            ], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .padding(scale)
+            contour.stroke(LinearGradient(colors: [.white.opacity(0.65), .white.opacity(0.08), .black.opacity(0.3)],
+                                          startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: scale)
+                .padding(1.8 * scale)
+            contour.stroke(.black.opacity(0.16), lineWidth: 0.7 * scale)
+                .padding(7.5 * scale)
+            contour.stroke(.white.opacity(0.18), lineWidth: 0.7 * scale)
+                .padding(8.5 * scale)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
@@ -98,67 +124,107 @@ private struct StoreHeader: View {
     let scale: CGFloat
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(white: 0.98), Color(red: 0.94, green: 0.93, blue: 0.87), Color(white: 0.82)], startPoint: .top, endPoint: .bottom)
-            Grain().opacity(0.06)
-            DSLogo(scale: scale)
-                .padding(.top, 5 * scale)
-            VStack {
+            LinearGradient(stops: [
+                .init(color: Color(white: 0.99), location: 0),
+                .init(color: Color(red: 0.95, green: 0.95, blue: 0.92), location: 0.5),
+                .init(color: Color(white: 0.82), location: 1)
+            ], startPoint: .top, endPoint: .bottom)
+            Grain().opacity(0.035)
+            DSStoreLogo(scale: scale)
+            VStack(spacing: 0) {
                 Spacer()
-                Rectangle().fill(.white.opacity(0.9)).frame(height: 3 * scale)
-                Rectangle().fill(Color(white: 0.62)).frame(height: 2 * scale)
+                Rectangle().fill(.white.opacity(0.95)).frame(height: 2 * scale)
+                Rectangle().fill(Color(white: 0.63)).frame(height: scale)
+                Rectangle().fill(LinearGradient(colors: [Color(white: 0.91), Color(white: 0.75)],
+                                                startPoint: .top, endPoint: .bottom))
+                    .frame(height: 5 * scale)
             }
         }
-        .frame(height: 147 * scale)
-        .shadow(color: .black.opacity(0.22), radius: 4 * scale, y: 5 * scale)
+        .frame(height: 132 * scale)
+        .shadow(color: .black.opacity(0.24), radius: 5 * scale, y: 5 * scale)
         .zIndex(1)
     }
 }
 
-private struct DSLogo: View {
+/// Familiar dual-screen geometry, with an original store wordmark.
+private struct DSStoreLogo: View {
     let scale: CGFloat
     var body: some View {
-        HStack(alignment: .center, spacing: 2 * scale) {
-            Text("NINTENDO")
-                .font(.system(size: 28 * scale, weight: .light, design: .rounded))
-                .tracking(-1.5 * scale)
+        HStack(alignment: .center, spacing: 9 * scale) {
+            // Tighten only the pair: tracking the whole word also trims the S's trailing edge off its frame.
+            Text("\(Text("D").tracking(-4 * scale))S")
+                .font(.system(size: 54 * scale, weight: .medium, design: .rounded))
+                .padding(.trailing, -4 * scale)
             VStack(spacing: 3 * scale) {
-                RoundedRectangle(cornerRadius: 1.5 * scale).stroke(Color(white: 0.48), lineWidth: 2 * scale)
-                RoundedRectangle(cornerRadius: 1.5 * scale).stroke(Color(white: 0.48), lineWidth: 2 * scale)
+                ForEach(0..<2) { _ in
+                    RoundedRectangle(cornerRadius: 2 * scale)
+                        .fill(LinearGradient(colors: [Color(white: 0.87), Color(white: 0.96)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 2 * scale)
+                                .strokeBorder(Color(white: 0.44), lineWidth: 1.7 * scale)
+                        }
+                }
             }
-            .frame(width: 15 * scale, height: 32 * scale)
-            Text("DS")
-                .font(.system(size: 53 * scale, weight: .medium, design: .rounded))
-                .tracking(-5 * scale)
-            Text("™").font(.system(size: 6 * scale)).offset(x: 4 * scale, y: 17 * scale)
+            .frame(width: 17 * scale, height: 35 * scale)
+            Text("STORE")
+                .font(.system(size: 33 * scale, weight: .light))
+                .tracking(-1.5 * scale)
         }
-        .foregroundStyle(Color(white: 0.08))
-        .shadow(color: .white, radius: 0, y: scale)
-        .accessibilityLabel("Nintendo DS")
+        .foregroundStyle(Color(white: 0.12))
+        .shadow(color: .white.opacity(0.95), radius: 0, y: scale)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("DS Store")
     }
 }
 
-private struct DisplayGame: Identifiable {
+struct DisplayGame: Identifiable {
     let id: String
     let title: String
+
+    var romURL: URL? { Bundle.main.url(forResource: id, withExtension: "nds", subdirectory: "Games") }
+    var isBundled: Bool { romURL != nil }
+
+    /// Every game in `ROM/`, each bundled as `Games/<id>.nds`. The id also names its box art.
     static let all = [
-        DisplayGame(id: "mario", title: "New Super Mario Bros."),
         DisplayGame(id: "kart", title: "Mario Kart DS"),
-        DisplayGame(id: "animal", title: "Animal Crossing"),
-        DisplayGame(id: "pokemon", title: "Pokémon Platinum"),
+        DisplayGame(id: "mario", title: "New Super Mario Bros."),
         DisplayGame(id: "zelda", title: "Phantom Hourglass"),
-        DisplayGame(id: "kirby", title: "Kirby Super Star Ultra"),
-        DisplayGame(id: "layton", title: "Professor Layton"),
-        DisplayGame(id: "dogs", title: "Nintendogs"),
-        DisplayGame(id: "heartgold", title: "Pokémon HeartGold")
+        DisplayGame(id: "gta", title: "GTA: Chinatown Wars"),
+        DisplayGame(id: "party", title: "Mario Party DS"),
+        DisplayGame(id: "gamewatch", title: "Game & Watch Collection"),
+        DisplayGame(id: "gamewatch2", title: "Game & Watch Collection 2"),
+        DisplayGame(id: "elements", title: "Elements of Destruction"),
+        DisplayGame(id: "doodlejump", title: "Doodle Jump Journey"),
+        DisplayGame(id: "elfbowling", title: "Elf Bowling 1 & 2"),
+        DisplayGame(id: "bakushow", title: "Bakushow"),
+        DisplayGame(id: "touchparty", title: "New Touch Party Game"),
+        DisplayGame(id: "dora", title: "Dora & Friends: Fantastic Flight"),
+        DisplayGame(id: "mathblaster", title: "Math Blaster"),
+        DisplayGame(id: "mathplay", title: "Math Play"),
+        DisplayGame(id: "matchstick", title: "Matchstick"),
+        DisplayGame(id: "sudokumania", title: "Sudoku Mania"),
+        DisplayGame(id: "sudokumaster", title: "Sudoku Master"),
+        DisplayGame(id: "sudokumaniacs", title: "Sudokumaniacs"),
+        DisplayGame(id: "sudokuro", title: "Sudokuro"),
+        DisplayGame(id: "kreuzwort", title: "SZ Mehr Kreuzworträtsel"),
+        DisplayGame(id: "matchingmaker", title: "Matching Maker DS"),
+        DisplayGame(id: "unoukids", title: "New Unou Kids DS"),
+        DisplayGame(id: "dekotora", title: "Bakusou Dekotora Densetsu Black")
     ]
 }
 
-/// Where each case sits on the shelf. Not observed: it's only read when a case flies back.
-private final class SlotFrames {
+private enum StoreSpace {
+    static let name = "store"
+}
+
+/// Where each case sits on the shelf, in the store's space. Only the insertion scene reads it, so only it
+/// updates when the shelf lays out, including a store that appears with a game already in the console.
+@Observable private final class SlotFrames {
     var frames: [String: CGRect] = [:]
 }
 
-private struct GameCase: View {
+struct GameCase: View {
     let game: DisplayGame
     let scale: CGFloat
     var body: some View {
@@ -176,154 +242,18 @@ private struct GameCase: View {
                 LinearGradient(colors: [.black.opacity(0.22), .white.opacity(0.45), .clear], startPoint: .leading, endPoint: .trailing)
                     .frame(width: 5 * scale)
             }
-            .shadow(color: .black.opacity(0.4), radius: 3 * scale, x: 4 * scale, y: 4 * scale)
-    }
-}
-
-/// The chosen game, lifted off its shelf into the middle of the dimmed store until the device opens.
-/// It follows the finger; letting go far enough away, or flicking it, puts it back on the shelf.
-private struct LiftedCase: View {
-    let game: DisplayGame
-    let caseWidth: CGFloat
-    let slotFrame: () -> CGRect?
-    let onPutBack: () -> Void
-
-    @State private var isLifted: Bool
-    @State private var drag = CGSize.zero
-    @State private var isPuttingBack = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private static let putBackDistance: CGFloat = 110
-    private static let flickSpeed: CGFloat = 700
-
-    init(game: DisplayGame, caseWidth: CGFloat, liftsIn: Bool,
-         slotFrame: @escaping () -> CGRect?, onPutBack: @escaping () -> Void) {
-        self.game = game
-        self.caseWidth = caseWidth
-        self.slotFrame = slotFrame
-        self.onPutBack = onPutBack
-        _isLifted = State(initialValue: !liftsIn)
-    }
-
-    var body: some View {
-        GeometryReader { proxy in
-            let origin = proxy.frame(in: .global).origin
-            let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
-            let slot = slotCenter(in: origin) ?? center
-            let caseHeight = caseWidth * 0.95
-            let liftedScale = min(proxy.size.width * 0.6 / caseWidth, proxy.size.height * 0.45 / caseHeight)
-            // Dragging away loosens the store's hold on the case: it shrinks a little and the dim lifts.
-            let pull = min(1, hypot(drag.width, drag.height) / 300)
-            // Under Reduce Motion the case only fades in and out, in the middle.
-            let isCentered = isLifted || reduceMotion
-
-            ZStack {
-                Color.black
-                    .opacity(isLifted ? 0.7 * (1 - 0.5 * pull) : 0)
-                    .ignoresSafeArea()
-                    .contentShape(Rectangle())
-                    .onTapGesture { putBack(center: center, origin: origin) }
-                    .accessibilityHidden(true)
-
-                hint
-                    .position(x: center.x, y: center.y + caseHeight * liftedScale / 2 + 48)
-
-                GameCase(game: game, scale: caseWidth / 150)
-                    .frame(width: caseWidth)
-                    .scaleEffect(isCentered ? liftedScale * (1 - 0.15 * pull) : 1)
-                    .shadow(color: .black.opacity(isLifted ? 0.45 : 0), radius: isLifted ? 24 : 0, y: isLifted ? 16 : 0)
-                    .opacity(isLifted || !reduceMotion ? 1 : 0)
-                    .position(isCentered ? center : slot)
-                    .offset(drag)
-                    .gesture(
-                        DragGesture()
-                            .onChanged { drag = $0.translation }
-                            .onEnded { release($0, center: center, origin: origin) }
-                    )
-                    .allowsHitTesting(!isPuttingBack)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(game.title)
-                    .accessibilityValue("Ready to play")
-                    .accessibilityHint("Open iPhone to play.")
-                    .accessibilityAction(named: "Put Back on Shelf") { putBack(center: center, origin: origin) }
-                    .accessibilityAction(.escape) { putBack(center: center, origin: origin) }
+            .overlay {
+                RoundedRectangle(cornerRadius: 2 * scale)
+                    .fill(LinearGradient(stops: [
+                        .init(color: .white.opacity(0.16), location: 0),
+                        .init(color: .white.opacity(0.025), location: 0.4),
+                        .init(color: .clear, location: 0.41),
+                        .init(color: .black.opacity(0.035), location: 1)
+                    ], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .allowsHitTesting(false)
             }
-            .accessibilityAddTraits(.isModal)
-        }
-        .sensoryFeedback(.impact(weight: .light), trigger: isLifted)
-        .onAppear {
-            guard !isLifted else { return }
-            withAnimation(reduceMotion ? .easeOut(duration: 0.25) : .spring(duration: 0.5, bounce: 0)) {
-                isLifted = true
-            }
-        }
-    }
-
-    private var hint: some View {
-        let isShown = isLifted && drag == .zero && !isPuttingBack
-        return VStack(spacing: 6) {
-            Text("Open to Play")
-                .font(.title2.weight(.semibold))
-                .fontDesign(.rounded)
-            Text("Or drag the case back to the shelf")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.6))
-        }
-        .foregroundStyle(.white)
-        .multilineTextAlignment(.center)
-        .fixedSize()
-        // Arrives once the case has landed; gets out of the way as soon as it's grabbed.
-        .opacity(isShown ? 1 : 0)
-        .animation(isShown ? .easeOut(duration: 0.3).delay(0.25) : .easeOut(duration: 0.15), value: isShown)
-        .accessibilityHidden(true)
-    }
-
-    /// Read fresh each time: the shelf may have laid out since this view last updated.
-    private func slotCenter(in origin: CGPoint) -> CGPoint? {
-        slotFrame().map { CGPoint(x: $0.midX - origin.x, y: $0.midY - origin.y) }
-    }
-
-    private func release(_ value: DragGesture.Value, center: CGPoint, origin: CGPoint) {
-        let travel = value.translation
-        let velocity = value.velocity
-        let isFlickedAway = hypot(velocity.width, velocity.height) > Self.flickSpeed
-            && velocity.width * travel.width + velocity.height * travel.height > 0
-        if hypot(travel.width, travel.height) > Self.putBackDistance || isFlickedAway {
-            putBack(center: center, origin: origin, velocity: velocity)
-            return
-        }
-
-        // Spring back to the middle, carrying the finger's speed (as a fraction of the way back per second).
-        let distanceSquared = travel.width * travel.width + travel.height * travel.height
-        let speed = distanceSquared > 1 ? -(velocity.width * travel.width + velocity.height * travel.height) / distanceSquared : 0
-        withAnimation(reduceMotion ? .easeOut(duration: 0.2)
-                      : .interpolatingSpring(duration: 0.35, bounce: 0.25, initialVelocity: min(max(speed, -10), 10))) {
-            drag = .zero
-        }
-    }
-
-    private func putBack(center: CGPoint, origin: CGPoint, velocity: CGSize = .zero) {
-        guard !isPuttingBack else { return }
-        isPuttingBack = true
-
-        let animation: Animation
-        if reduceMotion {
-            animation = .easeOut(duration: 0.2)
-        } else {
-            // Leave the finger at its speed, projected onto the flight back to the slot.
-            let slot = slotCenter(in: origin) ?? center
-            let path = CGSize(width: slot.x - center.x - drag.width, height: slot.y - center.y - drag.height)
-            let distanceSquared = path.width * path.width + path.height * path.height
-            let speed = distanceSquared > 1 ? (velocity.width * path.width + velocity.height * path.height) / distanceSquared : 0
-            animation = .interpolatingSpring(duration: 0.45, bounce: 0, initialVelocity: min(max(speed, 0), 10))
-        }
-
-        withAnimation(animation, completionCriteria: .logicallyComplete) {
-            isLifted = false
-            if !reduceMotion { drag = .zero }
-        } completion: {
-            onPutBack()
-        }
+            .shadow(color: .black.opacity(0.3), radius: 0.8 * scale, x: scale, y: scale)
+            .shadow(color: .black.opacity(0.3), radius: 4 * scale, x: 4 * scale, y: 3 * scale)
     }
 }
 
@@ -335,7 +265,7 @@ private struct GameShelf: View {
     let onSelect: (DisplayGame) -> Void
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .bottom, spacing: 30 * scale) {
+            HStack(alignment: .bottom, spacing: 24 * scale) {
                 ForEach(games) { game in
                     Button { onSelect(game) } label: {
                         GameCase(game: game, scale: scale)
@@ -344,17 +274,17 @@ private struct GameShelf: View {
                     .buttonStyle(.plain)
                     // The lifted case is drawn above the store; leave its spot empty.
                     .opacity(liftedGame == game.id ? 0 : 1)
-                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(StoreSpace.name)) } action: {
                         slotFrames.frames[game.id] = $0
                     }
                     .accessibilityLabel(game.title)
-                    .accessibilityHint(game.id == "kart" ? "Takes the game off the shelf, ready to play" : "Shows game availability")
+                    .accessibilityHint(game.isBundled ? "Takes the game off the shelf, ready to play" : "Shows game availability")
                 }
                 if games.count == 1 {
                     Color.clear.frame(width: 150 * scale, height: 1)
                 }
             }
-            .padding(.horizontal, 30 * scale)
+            .padding(.horizontal, 18 * scale)
             .padding(.top, 8 * scale)
             .padding(.bottom, 0)
             .frame(height: 158 * scale, alignment: .bottom)
@@ -406,7 +336,16 @@ private struct Pegboard: View {
             }
         }
         .background(LinearGradient(colors: [Color(white: 0.78), Color(white: 0.91), Color(white: 0.76)], startPoint: .leading, endPoint: .trailing))
-        .overlay { Grain(verticalOffset: verticalOffset).opacity(0.1) }
+        .overlay { Grain(verticalOffset: verticalOffset).opacity(0.055) }
+        .overlay {
+            LinearGradient(stops: [
+                .init(color: .black.opacity(0.16), location: 0),
+                .init(color: .clear, location: 0.09),
+                .init(color: .clear, location: 0.88),
+                .init(color: .black.opacity(0.18), location: 1)
+            ], startPoint: .leading, endPoint: .trailing)
+        }
+        .allowsHitTesting(false)
         .clipped()
         .accessibilityHidden(true)
     }

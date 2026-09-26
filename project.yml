@@ -58,18 +58,27 @@ targets:
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
         SWIFT_APPROACHABLE_CONCURRENCY: YES
     postBuildScripts:
-      - name: Bundle ROM
+      - name: Bundle ROMs
         basedOnDependencyAnalysis: false
         script: |
-          # Copies ROM/game.nds, or the .nds inside ROM/game.zip, into the app bundle (symlinks are followed).
-          NDS="${SRCROOT}/ROM/game.nds"
-          ZIP="${SRCROOT}/ROM/game.zip"
-          DEST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/game.nds"
-          if [ -e "$NDS" ]; then
-            cp -L "$NDS" "$DEST"
-          elif [ -e "$ZIP" ]; then
-            unzip -p "$ZIP" '*.nds' > "$DEST"
-          else
-            echo "warning: No ROM found at ROM/game.nds or ROM/game.zip; the app will show a placeholder."
-            rm -f "$DEST"
-          fi
+          # Copies each ROM/<id>.nds, or the .nds inside ROM/<id>.zip, to Games/<id>.nds (symlinks are followed).
+          # Unchanged games aren't copied again, and games no longer in ROM/ are removed.
+          DEST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Games"
+          mkdir -p "$DEST"
+          shopt -s nullglob
+          for rom in "$DEST"/*.nds; do
+            id=$(basename "$rom" .nds)
+            [ -e "${SRCROOT}/ROM/$id.nds" ] || [ -e "${SRCROOT}/ROM/$id.zip" ] || rm -f "$rom"
+          done
+          found=0
+          for src in "${SRCROOT}"/ROM/*.nds "${SRCROOT}"/ROM/*.zip; do
+            found=1
+            id=$(basename "${src%.*}")
+            out="$DEST/$id.nds"
+            [ "$out" -nt "$src" ] && continue
+            case "$src" in
+              *.nds) cp -L "$src" "$out" ;;
+              *.zip) unzip -p "$src" '*.nds' > "$out" ;;
+            esac
+          done
+          [ $found = 1 ] || echo "warning: No ROMs found in ROM/; every game will be unavailable."

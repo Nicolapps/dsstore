@@ -54,23 +54,23 @@ boot:
 uninstall:
     xcrun simctl uninstall "$(just simulator='{{ simulator }}' _udid)" {{ bundle_id }}
 
-# Symlink a game into ROM/ so it gets bundled into the app.
-rom path:
+# Symlink a game into ROM/ under its store id (e.g. `just rom kart path/to/game.zip`) so it gets bundled.
+rom id path:
     #!/usr/bin/env bash
     set -euo pipefail
     src='{{ path }}'
     ext=$(echo "${src##*.}" | tr '[:upper:]' '[:lower:]')
     [[ "$ext" == nds || "$ext" == zip ]] || { echo "error: expected a .nds or .zip file" >&2; exit 1; }
     [ -f "$src" ] || { echo "error: $src does not exist" >&2; exit 1; }
-    for existing in ROM/game.nds ROM/game.zip; do
+    for existing in ROM/{{ id }}.nds ROM/{{ id }}.zip; do
         if [ -e "$existing" ] && [ ! -L "$existing" ]; then
             echo "error: $existing is a real file, not a symlink; move it away first" >&2
             exit 1
         fi
     done
-    rm -f ROM/game.nds ROM/game.zip
-    ln -s "$(cd "$(dirname "$src")" && pwd)/$(basename "$src")" "ROM/game.$ext"
-    ls -l "ROM/game.$ext"
+    rm -f ROM/{{ id }}.nds ROM/{{ id }}.zip
+    ln -s "$(cd "$(dirname "$src")" && pwd)/$(basename "$src")" "ROM/{{ id }}.$ext"
+    ls -l "ROM/{{ id }}.$ext"
 
 # Update the vendored cores to their latest upstream commits, then re-bootstrap.
 update-vendor:

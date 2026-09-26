@@ -66,29 +66,47 @@ private struct ConsoleBody: View {
     }
 }
 
+/// Only the outside corners follow the display; the two hinge edges stay straight.
 private struct Shell: View {
     let scale: CGFloat
+    let isTop: Bool
+
+    private var contour: ConcentricRectangle {
+        ConcentricRectangle(
+            uniformTopCorners: isTop ? .concentric : .fixed(3 * scale),
+            uniformBottomCorners: isTop ? .fixed(3 * scale) : .concentric
+        )
+    }
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 25 * scale)
-            .fill(LinearGradient(stops: [
-                .init(color: .white, location: 0),
-                .init(color: Palette.shellLight, location: 0.12),
-                .init(color: Color(white: 0.92), location: 0.8),
-                .init(color: Palette.shellDark, location: 1)
-            ], startPoint: .topLeading, endPoint: .bottomTrailing))
-            .overlay {
-                RoundedRectangle(cornerRadius: 23 * scale)
-                    .strokeBorder(.white.opacity(0.95), lineWidth: 2 * scale)
-                    .padding(2 * scale)
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 19 * scale)
-                    .strokeBorder(Color(white: 0.64).opacity(0.4), lineWidth: 0.7 * scale)
-                    .padding(7 * scale)
-                    .shadow(color: .white, radius: 0, y: 1 * scale)
-            }
-            .shadow(color: .black.opacity(0.35), radius: 3 * scale, y: 2 * scale)
+        ZStack {
+            contour.fill(Color(white: 0.57))
+            contour
+                .fill(LinearGradient(stops: [
+                    .init(color: Color(white: 0.99), location: 0),
+                    .init(color: Color(white: 0.90), location: 0.28),
+                    .init(color: Color(white: 0.77), location: 0.76),
+                    .init(color: Color(white: 0.96), location: 1)
+                ], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .padding(0.7 * scale)
+            contour
+                .fill(LinearGradient(stops: [
+                    .init(color: Color(red: 0.98, green: 0.98, blue: 0.965), location: 0),
+                    .init(color: Color(red: 0.94, green: 0.945, blue: 0.93), location: 0.48),
+                    .init(color: Color(red: 0.86, green: 0.875, blue: 0.86), location: 1)
+                ], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .overlay {
+                    contour.stroke(.white.opacity(0.85), lineWidth: 0.8 * scale)
+                }
+                .padding(3 * scale)
+            // Fine parting line where the polished lip meets the satin faceplate.
+            contour.stroke(Color.black.opacity(0.12), lineWidth: 0.6 * scale)
+                .padding(6 * scale)
+            contour.stroke(.white.opacity(0.65), lineWidth: 0.7 * scale)
+                .padding(7 * scale)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
@@ -100,7 +118,7 @@ private struct TopHalf: View {
 
     var body: some View {
         ZStack {
-            Shell(scale: scale)
+            Shell(scale: scale, isTop: true)
             VStack(spacing: 0) {
                 HStack {
                     RubberFoot(scale: scale)
@@ -112,7 +130,7 @@ private struct TopHalf: View {
                     SpeakerGrill(scale: scale).frame(maxWidth: .infinity)
                     Screen(width: screenWidth, scale: scale) {
                         if emulator.status == .stopped {
-                            Palette.screenOff
+                            OffGlass()
                         } else {
                             ScreenView(renderer: emulator.screenRenderer, screenIndex: 0)
                                 .overlay { StatusOverlay(status: emulator.status, scale: scale) }
@@ -220,37 +238,37 @@ private struct BottomHalf: View {
 
     var body: some View {
         ZStack {
-            Shell(scale: scale)
+            Shell(scale: scale, isTop: false)
             VStack(spacing: 12 * scale) {
-                Screen(width: screenWidth, scale: scale) {
-                    // Without a game inserted, the console stays off.
-                    if emulator.status == .stopped {
-                        Palette.screenOff
-                    } else {
-                        ScreenView(renderer: emulator.screenRenderer, screenIndex: 1)
-                            .overlay { TouchSurface(emulator: emulator) }
-                    }
-                }
-                HStack(alignment: .center, spacing: 0) {
+                // The D-pad and face buttons flank the touch screen, each centered in its side gutter.
+                HStack(spacing: 0) {
                     DPad(emulator: emulator, size: 104 * scale)
-                    Spacer(minLength: 8 * scale)
-                    VStack(spacing: 12 * scale) {
-                        Text("Nintendo")
-                            .font(.system(size: 10 * scale, weight: .semibold, design: .rounded))
-                            .padding(.horizontal, 7 * scale).padding(.vertical, 1 * scale)
-                            .overlay { Capsule().stroke(Palette.engraving.opacity(0.6), lineWidth: 1) }
-                            .accessibilityHidden(true)
-                        HStack(spacing: 8 * scale) {
-                            PillButton(button: .select, title: "SELECT", emulator: emulator, scale: scale)
-                            PillButton(button: .start, title: "START", emulator: emulator, scale: scale)
+                        .frame(maxWidth: .infinity)
+                    Screen(width: screenWidth, scale: scale) {
+                        // Without a game inserted, the console stays off.
+                        if emulator.status == .stopped {
+                            OffGlass()
+                        } else {
+                            ScreenView(renderer: emulator.screenRenderer, screenIndex: 1)
+                                .overlay { TouchSurface(emulator: emulator) }
                         }
                     }
-                    .foregroundStyle(Palette.engraving)
-                    Spacer(minLength: 8 * scale)
                     FaceButtons(emulator: emulator, size: 114 * scale)
+                        .frame(maxWidth: .infinity)
                 }
-                .frame(height: 114 * scale)
-                .padding(.horizontal, 37 * scale)
+                .padding(.horizontal, 8 * scale)
+                VStack(spacing: 12 * scale) {
+                    Text("Nintendo")
+                        .font(.system(size: 10 * scale, weight: .semibold, design: .rounded))
+                        .padding(.horizontal, 7 * scale).padding(.vertical, 1 * scale)
+                        .overlay { Capsule().stroke(Palette.engraving.opacity(0.6), lineWidth: 1) }
+                        .accessibilityHidden(true)
+                    HStack(spacing: 8 * scale) {
+                        PillButton(button: .select, title: "SELECT", emulator: emulator, scale: scale)
+                        PillButton(button: .start, title: "START", emulator: emulator, scale: scale)
+                    }
+                }
+                .foregroundStyle(Palette.engraving)
             }
             .padding(.top, 28 * scale)
             .padding(.bottom, bottomInset)
@@ -268,6 +286,21 @@ private struct BottomHalf: View {
     }
 }
 
+private struct OffGlass: View {
+    var body: some View {
+        LinearGradient(stops: [
+            .init(color: Color(red: 0.17, green: 0.19, blue: 0.17), location: 0),
+            .init(color: Palette.screenOff, location: 0.45),
+            .init(color: Color(red: 0.105, green: 0.12, blue: 0.11), location: 1)
+        ], startPoint: .topLeading, endPoint: .bottomTrailing)
+        .overlay {
+            Rectangle().fill(LinearGradient(colors: [.white.opacity(0.045), .clear],
+                                            startPoint: .top, endPoint: .center))
+        }
+        .overlay { Rectangle().strokeBorder(.black.opacity(0.35), lineWidth: 1) }
+    }
+}
+
 private struct Screen<Content: View>: View {
     let width: CGFloat
     let scale: CGFloat
@@ -278,12 +311,12 @@ private struct Screen<Content: View>: View {
             .frame(width: width, height: width * 3 / 4)
             .clipped()
             .padding(3 * scale)
-            .background(Color(white: 0.16))
+            .background(Color(red: 0.20, green: 0.21, blue: 0.19))
             .overlay { Rectangle().stroke(.black.opacity(0.5), lineWidth: scale).allowsHitTesting(false) }
             .padding(7 * scale)
             .background {
                 RoundedRectangle(cornerRadius: 3 * scale)
-                    .fill(LinearGradient(colors: [Color(white: 0.77), .white, Color(white: 0.94)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .fill(LinearGradient(colors: [Color(white: 0.62), Color(white: 0.87), Color(white: 0.99)], startPoint: .topLeading, endPoint: .bottomTrailing))
                     .shadow(color: .black.opacity(0.25), radius: 1 * scale, x: -0.7 * scale, y: -0.8 * scale)
                     .shadow(color: .white, radius: 0.5 * scale, x: 1 * scale, y: 1.5 * scale)
             }
@@ -306,7 +339,7 @@ private struct StatusOverlay: View {
     }
     private var message: String? {
         switch status {
-        case .missingROM: "No game found.\nPut a ROM at ROM/game.nds\n(or game.zip) and rebuild."
+        case .missingROM: "This game’s ROM isn’t bundled.\nPut it in ROM/<id>.zip\nand rebuild."
         case .failed(let reason): reason
         case .stopped, .running, .paused: nil
         }

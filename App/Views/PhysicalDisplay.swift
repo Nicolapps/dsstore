@@ -37,6 +37,9 @@ private final class PhysicalDisplayController<Content: View>: UIViewController {
 
     override var prefersStatusBarHidden: Bool { true }
     override var prefersHomeIndicatorAutoHidden: Bool { true }
+    /// Freezes the scene's interface orientation while this is on screen, so the system
+    /// never runs a rotation. SwiftUI's hosting controller forwards this preference to us.
+    override var prefersInterfaceOrientationLocked: Bool { true }
 
     func update(content: Content, upsideDown: Bool) {
         host.rootView = content
@@ -60,23 +63,14 @@ private final class PhysicalDisplayController<Content: View>: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        setNeedsUpdateOfPrefersInterfaceOrientationLocked()
         layoutContent()
-    }
-
-    override func viewWillTransition(to size: CGSize, with coordinator: any UIViewControllerTransitionCoordinator) {
-        super.viewWillTransition(to: size, with: coordinator)
-        // Cancel the window's rotation in the same transaction; the content remains
-        // attached to the same physical display, including during the transition.
-        coordinator.animate(alongsideTransition: { _ in
-            self.layoutContent()
-        }, completion: { _ in
-            self.layoutContent()
-        })
     }
 
     private func layoutContent() {
         guard let screen = view.window?.windowScene?.screen else { return }
-        // Unlike the scene's rotating coordinate space, this is attached to the hardware.
+        // The lock keeps whichever orientation the scene had when it engaged, so map
+        // that orientation onto the hardware, whose coordinate space never rotates.
         let physicalSpace = screen.fixedCoordinateSpace
         let physicalBounds = view.convert(view.bounds, to: physicalSpace)
         let origin = view.convert(CGPoint.zero, from: physicalSpace)

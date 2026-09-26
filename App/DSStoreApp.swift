@@ -34,6 +34,7 @@ private struct DuoRootView: View {
                 try? await Task.sleep(for: .milliseconds(500))
                 if pose == .unknown { pose = .noHinge }
             }
+            .onAppear { print("DBG root appear \(ObjectIdentifier(emulator))") } // DBG
             .onChange(of: pose) { syncEmulator() }
             .onChange(of: fillsScreen) { syncEmulator() }
             .onChange(of: selectedGame) { syncEmulator() }
@@ -59,9 +60,10 @@ private struct DuoRootView: View {
 
     /// Runs the selected game only while the console is on screen.
     private func syncEmulator() {
-        guard selectedGame != nil else { return emulator.stop() }
+        print("DBG sync game=\(selectedGame ?? "nil") pose=\(pose) fills=\(fillsScreen) phase=\(scenePhase) status=\(emulator.status)") // DBG
+        guard let selectedGame else { return emulator.stop() }
         guard pose == .open, fillsScreen, scenePhase == .active else { return emulator.pause() }
-        emulator.start()
+        emulator.start(gameID: selectedGame)
         emulator.resume()
     }
 }

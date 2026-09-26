@@ -42,6 +42,7 @@ final class DSEmulator {
     let screenRenderer = ScreenRenderer()
 
     @ObservationIgnored private var core: EmulatorCore?
+    @ObservationIgnored private var currentGameID: String?
     @ObservationIgnored private let bridge = MelonDS.core.emulatorBridge
 
     /// Launch with `DSSTORE_MUTE=1` to silence the game, e.g. while testing in the simulator.
@@ -51,10 +52,13 @@ final class DSEmulator {
         Delta.register(MelonDS.core)
     }
 
-    func start() {
-        guard core == nil else { return }
+    /// Boots the game with this id, ejecting any other game first.
+    func start(gameID: String) {
+        if core != nil, currentGameID == gameID { return }
+        stop()
+        currentGameID = gameID
 
-        guard let game = BundledGame() else {
+        guard let game = BundledGame(id: gameID) else {
             status = .missingROM
             return
         }
@@ -85,13 +89,14 @@ final class DSEmulator {
         status = .running
     }
 
-    /// Ejects the game, saving it first; the next `start()` boots it from scratch.
+    /// Ejects the game, saving it first; the next `start(gameID:)` boots it from scratch.
     func stop() {
         if let core {
             core.stop()
             bridge.resetInputs()
             self.core = nil
         }
+        currentGameID = nil
         status = .stopped
     }
 
@@ -125,19 +130,22 @@ final class DSEmulator {
     }
 }
 
-/// The single game the app plays: `game.nds`, copied into the bundle at build time.
+/// A game copied into the bundle at build time as `Games/<id>.nds`.
 private struct BundledGame: GameProtocol {
     let fileURL: URL
+    let gameSaveURL: URL
     let type = GameType.ds
 
-    /// Saves can't live next to the ROM because the app bundle is read-only.
-    var gameSaveURL: URL {
-        URL.applicationSupportDirectory.appending(path: "game.dsv")
-    }
-
-    init?() {
-        guard let url = Bundle.main.url(forResource: "game", withExtension: "nds") else { return nil }
+    init?(id: String) {
+        guard let url = Bundle.main.url(forResource: id, withExtension: "nds", subdirectory: "Games") else { return nil }
         fileURL = url
-        try? FileManager.default.createDirectory(at: .applicationSupportDirectory, withIntermediateDirectories: true)
+        // Saves can't live next to the ROM because the app bundle is read-only.
+        let saves = URL.applicationSupportDirectory.appending(path: "Saves")
+        gameSaveURL = saves.appending(path: "\(id).dsv")
+        try? FileManager.default.createDirectory(at: saves, withIntermediateDirectories: true)
+        // Mario Kart was once the only game, saved as `game.dsv`.
+        if id == "kart" {
+            try? FileManager.default.moveItem(at: .applicationSupportDirectory.appending(path: "game.dsv"), to: gameSaveURL)
+        }
     }
 }
