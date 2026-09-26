@@ -1,0 +1,66 @@
+name: DSStore
+
+options:
+  bundleIdPrefix: com.nicolasettlin
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+projectReferences:
+  MelonDSDeltaCore:
+    path: Vendor/MelonDSDeltaCore/MelonDSDeltaCore.xcodeproj
+  DeltaCore:
+    path: Vendor/DeltaCore/DeltaCore.xcodeproj
+  ZIPFoundation:
+    path: Vendor/DeltaCore/External/ZIPFoundation/ZIPFoundation.xcodeproj
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    # melonDS' ARM64 JIT linkage is assembly that only builds for arm64.
+    EXCLUDED_ARCHS[sdk=iphonesimulator*]: x86_64
+
+targets:
+  DSStore:
+    type: application
+    platform: iOS
+    sources:
+      - App
+    dependencies:
+      - target: MelonDSDeltaCore/MelonDSDeltaCore
+      - target: DeltaCore/DeltaCore
+      - target: ZIPFoundation/ZIPFoundation
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: DS
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+        UIRequiresFullScreen: true
+        UIStatusBarHidden: true
+        NSMicrophoneUsageDescription: Some games ask you to blow or speak into the microphone.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nicolasettlin.dsstore
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
+    postBuildScripts:
+      - name: Bundle ROM
+        basedOnDependencyAnalysis: false
+        script: |
+          # Copies ROM/game.nds (following symlinks) into the app bundle.
+          ROM="${SRCROOT}/ROM/game.nds"
+          DEST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/game.nds"
+          if [ -e "$ROM" ]; then
+            cp -L "$ROM" "$DEST"
+          else
+            echo "warning: No ROM found at ROM/game.nds; the app will show a placeholder."
+            rm -f "$DEST"
+          fi

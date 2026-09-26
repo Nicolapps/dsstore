@@ -1,0 +1,13 @@
+# Xcode
+*.xcodeproj/
+!Vendor/**/*.xcodeproj/
+xcuserdata/
+DerivedData/
+build/
+.DS_Store
+
+# Game files are never committed.
+ROM/*
+!ROM/README.md
+*.nds
+*.dsv
