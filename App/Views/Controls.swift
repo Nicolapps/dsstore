@@ -30,6 +30,10 @@ private struct HardwareButton<Label: View>: View {
             .onChange(of: isPressed) { _, pressed in
                 if pressed { emulator.press(button) } else { emulator.release(button) }
             }
+            .onDisappear {
+                if isPressed { emulator.release(button) }
+                isPressed = false
+            }
     }
 }
 
@@ -55,14 +59,21 @@ struct FaceButtons: View {
         let diameter = size * 0.34
         return HardwareButton(button: button, emulator: emulator) { isPressed in
             Circle()
-                .fill(isPressed ? Palette.buttonPressed : Palette.button)
+                .fill(LinearGradient(
+                    colors: isPressed ? [Palette.buttonPressed, Palette.button] : [.white, Palette.button, Color(white: 0.85)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                ))
+                .overlay { Circle().strokeBorder(.white.opacity(0.85), lineWidth: diameter * 0.035) }
                 .overlay {
                     Text(title)
-                        .font(.system(size: diameter * 0.42, weight: .semibold, design: .rounded))
+                        .font(.system(size: diameter * 0.42, weight: .regular, design: .rounded))
                         .foregroundStyle(Palette.buttonLabel)
+                        .shadow(color: .white, radius: 0, y: 1)
                 }
-                .shadow(color: .black.opacity(isPressed ? 0.1 : 0.3), radius: isPressed ? 0.5 : 1.5, y: isPressed ? 0.5 : 1.5)
-                .scaleEffect(isPressed ? 0.94 : 1)
+                .shadow(color: .black.opacity(isPressed ? 0.16 : 0.35), radius: isPressed ? 0.5 : 1.2, y: isPressed ? 0.5 : 2.5)
+                .padding(2)
+                .background { Circle().fill(Color(white: 0.65)).shadow(color: .white, radius: 0, y: 1) }
+                .offset(y: isPressed ? 1 : 0)
                 .frame(width: diameter, height: diameter)
         }
         .accessibilityLabel(title)
@@ -81,17 +92,26 @@ struct DPad: View {
         let arm = size * 0.34
 
         ZStack {
-            RoundedRectangle(cornerRadius: arm * 0.18)
-                .frame(width: arm, height: size)
-            RoundedRectangle(cornerRadius: arm * 0.18)
-                .frame(width: size, height: arm)
+            DPadShape()
+                .fill(Color(white: 0.62))
+                .padding(-2)
+                .shadow(color: .white, radius: 0.5, y: 1)
+            DPadShape()
+                .fill(LinearGradient(colors: [.white, Color(white: 0.93), Color(white: 0.81)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .overlay { DPadShape().stroke(.white.opacity(0.9), lineWidth: 1) }
+                .shadow(color: .black.opacity(0.28), radius: 1, y: pressed.isEmpty ? 2 : 0.5)
+            ForEach(0..<4, id: \.self) { direction in
+                Capsule()
+                    .fill(Color(white: 0.74))
+                    .frame(width: 2, height: arm * 0.38)
+                    .shadow(color: .white, radius: 0, x: 1, y: 1)
+                    .offset(y: -size * 0.32)
+                    .rotationEffect(.degrees(Double(direction) * 90))
+            }
             Circle()
-                .fill(.black.opacity(0.25))
-                .frame(width: arm * 0.45)
+                .fill(RadialGradient(colors: [Color(white: 0.86), Color(white: 0.94)], center: .center, startRadius: 0, endRadius: arm * 0.25))
+                .frame(width: arm * 0.48, height: arm * 0.48)
         }
-        .foregroundStyle(Palette.dpad)
-        .shadow(color: .black.opacity(0.3), radius: 1.5, y: 1.5)
-        .rotation3DEffect(.degrees(pressed.isEmpty ? 0 : 8), axis: tiltAxis)
         .frame(width: size, height: size)
         .contentShape(Rectangle())
         .gesture(
@@ -99,6 +119,8 @@ struct DPad: View {
                 .onChanged { value in update(directions(at: value.location)) }
                 .onEnded { _ in update([]) }
         )
+        .onDisappear { update([]) }
+        .accessibilityLabel("Directional pad")
         .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: pressed) { old, new in
             !new.subtracting(old).isEmpty
         }
@@ -125,10 +147,23 @@ struct DPad: View {
         pressed = newValue
     }
 
-    private var tiltAxis: (x: CGFloat, y: CGFloat, z: CGFloat) {
-        let x: CGFloat = (pressed.contains(.up) ? 1 : 0) - (pressed.contains(.down) ? 1 : 0)
-        let y: CGFloat = (pressed.contains(.right) ? 1 : 0) - (pressed.contains(.left) ? 1 : 0)
-        return (x, y, 0)
+}
+
+/// One continuous molded cross, with no overlapping rectangle seams.
+nonisolated private struct DPadShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let a: CGFloat = 0.34
+        let b: CGFloat = 0.66
+        let points: [CGPoint] = [
+            CGPoint(x: a, y: 0), CGPoint(x: b, y: 0), CGPoint(x: b, y: a),
+            CGPoint(x: 1, y: a), CGPoint(x: 1, y: b), CGPoint(x: b, y: b),
+            CGPoint(x: b, y: 1), CGPoint(x: a, y: 1), CGPoint(x: a, y: b),
+            CGPoint(x: 0, y: b), CGPoint(x: 0, y: a), CGPoint(x: a, y: a)
+        ]
+        return Path { path in
+            path.addLines(points.map { CGPoint(x: rect.minX + $0.x * rect.width, y: rect.minY + $0.y * rect.height) })
+            path.closeSubpath()
+        }
     }
 }
 
@@ -144,7 +179,8 @@ struct PillButton: View {
         HardwareButton(button: button, emulator: emulator) { isPressed in
             VStack(spacing: 3 * scale) {
                 Circle()
-                    .fill(isPressed ? Palette.buttonPressed : Palette.button)
+                    .fill(LinearGradient(colors: isPressed ? [Palette.buttonPressed, Palette.button] : [.white, Color(white: 0.85)], startPoint: .top, endPoint: .bottom))
+                    .overlay { Circle().strokeBorder(Color(white: 0.7), lineWidth: 0.7) }
                     .shadow(color: .black.opacity(isPressed ? 0.1 : 0.3), radius: 1, y: isPressed ? 0.5 : 1)
                     .frame(width: 16 * scale, height: 16 * scale)
                 Text(title)
@@ -174,13 +210,14 @@ struct ShoulderButton: View {
                 topTrailingRadius: isLeft ? 6 * scale : 18 * scale,
                 style: .continuous
             )
-            .fill(isPressed ? Palette.shoulderPressed : Palette.shoulder)
+            .fill(LinearGradient(colors: isPressed ? [Color(white: 0.78), Palette.button] : [.white, Color(white: 0.83)], startPoint: .top, endPoint: .bottom))
+            .shadow(color: .black.opacity(0.22), radius: 1, y: 1)
             .overlay {
                 Text(isLeft ? "L" : "R")
                     .font(.system(size: 11 * scale, weight: .semibold, design: .rounded))
                     .foregroundStyle(Palette.engraving)
             }
-            .frame(width: 84 * scale, height: 22 * scale)
+            .frame(width: 33 * scale, height: 29 * scale)
             .offset(y: isPressed ? 2 * scale : 0)
         }
         .accessibilityLabel(isLeft ? "L" : "R")

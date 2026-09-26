@@ -13,3 +13,6 @@ ROM/*
 *.dsv
 *.zip
 *.7z
+
+# Local design screenshots.
+previews/

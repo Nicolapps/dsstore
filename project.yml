@@ -39,15 +39,20 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationPortraitUpsideDown
-        UIRequiresFullScreen: true
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         UIStatusBarHidden: true
         NSMicrophoneUsageDescription: Some games ask you to blow or speak into the microphone.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.ettlin.nicolas.dsstore
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
         SWIFT_APPROACHABLE_CONCURRENCY: YES
