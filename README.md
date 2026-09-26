@@ -1,4 +1,6 @@
-# DSStore
+# DS Store
+
+[![DS Store demo video](docs/thumbnail.jpg)](https://www.youtube.com/watch?v=TYAI9_DCh04)
 
 A SwiftUI Nintendo DS app for iOS, built on [DeltaCore](https://github.com/rileytestut/DeltaCore) and [melonDS](https://melonds.kuribo64.net) (via [MelonDSDeltaCore](https://github.com/rileytestut/MelonDSDeltaCore)). It boots a single game bundled into the app.
 
