@@ -22,7 +22,7 @@ struct ConsoleView: View {
     let emulator: DSEmulator
 
     /// The console is designed at this size and scaled uniformly to fit.
-    private static let designSize = CGSize(width: 380, height: 690)
+    private static let designSize = CGSize(width: 380, height: 730)
 
     var body: some View {
         GeometryReader { proxy in
@@ -74,7 +74,7 @@ private struct TopHalf: View {
             HStack(spacing: 0) {
                 SpeakerGrill(scale: scale).frame(maxWidth: .infinity)
                 Screen(scale: scale) {
-                    ScreenView(gameView: emulator.topScreen)
+                    ScreenView(renderer: emulator.screenRenderer, screenIndex: 0)
                         .overlay { StatusOverlay(status: emulator.status, scale: scale) }
                 }
                 SpeakerGrill(scale: scale).frame(maxWidth: .infinity)
@@ -172,7 +172,7 @@ private struct BottomHalf: View {
         Shell(scale: scale) {
             VStack(spacing: 18 * scale) {
                 Screen(scale: scale) {
-                    ScreenView(gameView: emulator.bottomScreen)
+                    ScreenView(renderer: emulator.screenRenderer, screenIndex: 1)
                         .overlay { TouchSurface(emulator: emulator) }
                 }
 

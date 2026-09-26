@@ -1,4 +1,3 @@
-import CoreImage
 import Observation
 @preconcurrency import DeltaCore
 @preconcurrency import MelonDSDeltaCore
@@ -39,19 +38,17 @@ final class DSEmulator {
 
     private(set) var status: Status = .stopped
 
-    /// Views displaying the top and bottom screens. Both render the same video feed, cropped to their half.
-    let topScreen = GameView()
-    let bottomScreen = GameView()
+    /// Draws both screens from the emulator's frames.
+    let screenRenderer = ScreenRenderer()
 
     @ObservationIgnored private var core: EmulatorCore?
     @ObservationIgnored private let bridge = MelonDS.core.emulatorBridge
 
+    /// Launch with `DSSTORE_MUTE=1` to silence the game, e.g. while testing in the simulator.
+    @ObservationIgnored private let isMuted = ProcessInfo.processInfo.environment["DSSTORE_MUTE"] == "1"
+
     init() {
         Delta.register(MelonDS.core)
-
-        // melonDS outputs both screens stacked in a single 256×384 frame.
-        topScreen.filter = FilterChain(filters: [Self.cropFilter(screenIndex: 0)])
-        bottomScreen.filter = FilterChain(filters: [Self.cropFilter(screenIndex: 1)])
     }
 
     func start() {
@@ -62,14 +59,15 @@ final class DSEmulator {
             return
         }
 
-        guard let core = EmulatorCore(game: game) else {
+        // Frames are drawn by ScreenRenderer, but this keeps DeltaCore from creating OpenGL ES contexts.
+        guard let core = EmulatorCore(game: game, options: [.metal: true]) else {
             status = .failed("The DS core is not registered.")
             return
         }
 
-        core.add(topScreen)
-        core.add(bottomScreen)
+        core.updateHandler = Self.frameHandler(uploadingTo: screenRenderer)
         core.start()
+        if isMuted { core.audioManager.isEnabled = false }
 
         self.core = core
         status = .running
@@ -83,6 +81,7 @@ final class DSEmulator {
 
     func resume() {
         guard let core, core.resume() else { return }
+        if isMuted { core.audioManager.isEnabled = false }
         status = .running
     }
 
@@ -107,10 +106,12 @@ final class DSEmulator {
         bridge.deactivateInput(MelonDSGameInput.touchScreenY.rawValue, playerIndex: 0)
     }
 
-    private static func cropFilter(screenIndex: Int) -> CIFilter {
-        // FilterChain works in top-left-origin coordinates.
-        let rect = CGRect(x: 0, y: 192 * screenIndex, width: 256, height: 192)
-        return CIFilter(name: "CICrop", parameters: ["inputRectangle": CIVector(cgRect: rect)])!
+    /// Built outside the main actor because DeltaCore calls it on its emulation thread.
+    private nonisolated static func frameHandler(uploadingTo renderer: ScreenRenderer) -> (EmulatorCore) -> Void {
+        { core in
+            guard let pixels = core.videoManager.videoBuffer else { return }
+            renderer.upload(pixels)
+        }
     }
 }
 
