@@ -1,0 +1,89 @@
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+project := "DSStore.xcodeproj"
+scheme := "DSStore"
+bundle_id := "com.nicolasettlin.dsstore"
+derived_data := "build/DerivedData"
+app := derived_data / "Build/Products/Debug-iphonesimulator/DSStore.app"
+
+# Simulator to build for and run on; override with `just simulator="iPhone 17" run`.
+simulator := "iPhone 18 Pro"
+
+# List available recipes.
+default:
+    @just --list
+
+# Fetch submodules, patch them for the current Xcode, and generate the Xcode project.
+bootstrap:
+    Scripts/bootstrap.sh
+
+# Regenerate the Xcode project from project.yml.
+generate:
+    xcodegen generate
+
+# Open the project in Xcode, generating it first if needed.
+open:
+    [ -d {{ project }} ] || just bootstrap
+    open {{ project }}
+
+# Build the app for the simulator.
+build: _project
+    xcodebuild build \
+        -project {{ project }} \
+        -scheme {{ scheme }} \
+        -configuration Debug \
+        -destination 'platform=iOS Simulator,name={{ simulator }}' \
+        -derivedDataPath {{ derived_data }} \
+        | {{ if `command -v xcbeautify || true` != "" { "xcbeautify" } else { "cat" } }}
+
+# Build, install and launch the app on the simulator, streaming its console output.
+run: build boot
+    xcrun simctl install '{{ simulator }}' {{ app }}
+    xcrun simctl launch --console-pty --terminate-running-process '{{ simulator }}' {{ bundle_id }}
+
+# Boot the simulator and bring the Simulator app to the front.
+boot:
+    xcrun simctl boot '{{ simulator }}' 2>/dev/null || true
+    open -a Simulator
+
+# Uninstall the app from the simulator (also clears its save data).
+uninstall:
+    xcrun simctl uninstall '{{ simulator }}' {{ bundle_id }}
+
+# Symlink a game into ROM/ so it gets bundled into the app.
+rom path:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    src='{{ path }}'
+    ext=$(echo "${src##*.}" | tr '[:upper:]' '[:lower:]')
+    [[ "$ext" == nds || "$ext" == zip ]] || { echo "error: expected a .nds or .zip file" >&2; exit 1; }
+    [ -f "$src" ] || { echo "error: $src does not exist" >&2; exit 1; }
+    for existing in ROM/game.nds ROM/game.zip; do
+        if [ -e "$existing" ] && [ ! -L "$existing" ]; then
+            echo "error: $existing is a real file, not a symlink; move it away first" >&2
+            exit 1
+        fi
+    done
+    rm -f ROM/game.nds ROM/game.zip
+    ln -s "$(cd "$(dirname "$src")" && pwd)/$(basename "$src")" "ROM/game.$ext"
+    ls -l "ROM/game.$ext"
+
+# Update the vendored cores to their latest upstream commits, then re-bootstrap.
+update-vendor:
+    git submodule update --remote --recursive
+    just bootstrap
+
+# Remove build products.
+clean:
+    rm -rf build
+
+# Remove build products and the generated Xcode project.
+clean-all: clean
+    rm -rf {{ project }}
+
+# List the available iPhone simulators.
+simulators:
+    xcrun simctl list devices available | grep -E 'iPhone|-- iOS'
+
+_project:
+    [ -d {{ project }} ] || just bootstrap
