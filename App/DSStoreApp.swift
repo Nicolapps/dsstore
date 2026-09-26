@@ -49,7 +49,9 @@ private struct DuoRootView: View {
         case _ where !fillsScreen:
             UnsupportedView(reason: .splitView)
         case .closed:
+            // The shelf stands upright on the outer display however the device is held.
             GameSelectionView(selection: $selectedGame)
+                .attachedToPhysicalDisplay()
         case .open:
             ConsoleView(emulator: emulator)
         }

@@ -13,87 +13,17 @@ enum Palette {
     static let screenOff = Color(red: 0.13, green: 0.14, blue: 0.13)
 }
 
-/// Keep the console attached to the physical display, independent of interface rotation.
 struct ConsoleView: View {
     let emulator: DSEmulator
 
     var body: some View {
-        PhysicalConsole(emulator: emulator)
-            .ignoresSafeArea()
+        // Hold the device upside down relative to its fixed portrait orientation, so
+        // the top screen sits on the physical half that is at the bottom in portrait.
+        ConsoleBody(emulator: emulator)
+            .attachedToPhysicalDisplay(upsideDown: true)
             .statusBarHidden()
             .persistentSystemOverlays(.hidden)
             .preferredColorScheme(.light)
-    }
-}
-
-private struct PhysicalConsole: UIViewControllerRepresentable {
-    let emulator: DSEmulator
-
-    func makeUIViewController(context: Context) -> PhysicalConsoleController {
-        PhysicalConsoleController(emulator: emulator)
-    }
-
-    func updateUIViewController(_ controller: PhysicalConsoleController, context: Context) {}
-}
-
-private final class PhysicalConsoleController: UIViewController {
-    private let console: UIHostingController<ConsoleBody>
-
-    init(emulator: DSEmulator) {
-        console = UIHostingController(rootView: ConsoleBody(emulator: emulator))
-        super.init(nibName: nil, bundle: nil)
-        console.safeAreaRegions = []
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    override var prefersStatusBarHidden: Bool { true }
-    override var prefersHomeIndicatorAutoHidden: Bool { true }
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        view.backgroundColor = .black
-        addChild(console)
-        view.addSubview(console.view)
-        console.didMove(toParent: self)
-    }
-
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        layoutConsole()
-    }
-
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        layoutConsole()
-    }
-
-    override func viewWillTransition(to size: CGSize, with coordinator: any UIViewControllerTransitionCoordinator) {
-        super.viewWillTransition(to: size, with: coordinator)
-        // Cancel the window's rotation in the same transaction; the console remains
-        // attached to the same physical halves, including during the transition.
-        coordinator.animate(alongsideTransition: { _ in
-            self.layoutConsole()
-        }, completion: { _ in
-            self.layoutConsole()
-        })
-    }
-
-    private func layoutConsole() {
-        guard let screen = view.window?.windowScene?.screen else { return }
-        // Unlike the scene's rotating coordinate space, this is attached to the
-        // hardware. In the inner display's fixed portrait space the fold is y / 2.
-        let physicalSpace = screen.fixedCoordinateSpace
-        let physicalBounds = view.convert(view.bounds, to: physicalSpace)
-        let origin = view.convert(CGPoint.zero, from: physicalSpace)
-        let right = view.convert(CGPoint(x: 1, y: 0), from: physicalSpace)
-        let angle = atan2(right.y - origin.y, right.x - origin.x)
-
-        console.view.bounds = CGRect(origin: .zero, size: physicalBounds.size)
-        console.view.center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
-        // Hold the device upside down relative to its fixed portrait orientation, so
-        // the top screen sits on the physical half that is at the bottom in portrait.
-        console.view.transform = CGAffineTransform(rotationAngle: angle + .pi)
     }
 }
 
