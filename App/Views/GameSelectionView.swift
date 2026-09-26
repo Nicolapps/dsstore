@@ -1,10 +1,14 @@
 import SwiftUI
 
-/// A miniature retail display with a route into the bundled game.
+/// A miniature retail display. Choosing a game lifts its case off the shelf, ready to play.
 struct GameSelectionView: View {
-    var onPlay: () -> Void = {}
+    /// The lifted game, owned by the caller so it stays lifted while the device is open.
+    @Binding var selection: String?
     @State private var unavailableGame: DisplayGame?
     @State private var shelfOffset: CGFloat = 0
+    @State private var slotFrames = SlotFrames()
+    /// Only a case picked here flies in; one already lifted when the store appears is just there.
+    @State private var liftsIn = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -13,6 +17,13 @@ struct GameSelectionView: View {
                 // Keep the frame below the Duo camera, including configurations that report no top inset.
                 .padding(.top, max(16, 80 - geometry.safeAreaInsets.top))
                 .frame(width: geometry.size.width, height: geometry.size.height)
+                .overlay {
+                    if let game = DisplayGame.all.first(where: { $0.id == selection }) {
+                        LiftedCase(game: game, caseWidth: 150 * scale, liftsIn: liftsIn,
+                                   slotFrame: { slotFrames.frames[game.id] },
+                                   onPutBack: { selection = nil })
+                    }
+                }
         }
         .ignoresSafeArea(edges: [.horizontal, .bottom])
         .background(Color.black.ignoresSafeArea())
@@ -30,10 +41,15 @@ struct GameSelectionView: View {
             StoreHeader(scale: s)
             ScrollView(.vertical) {
                 VStack(spacing: 0) {
-                    ForEach(0..<((DisplayGame.all.count + 1) / 2)) { row in
-                        GameShelf(games: Array(DisplayGame.all.dropFirst(row * 2).prefix(2)), scale: s) { game in
-                            if game.id == "kart" { onPlay() }
-                            else { unavailableGame = game }
+                    ForEach(0..<((DisplayGame.all.count + 1) / 2), id: \.self) { row in
+                        GameShelf(games: Array(DisplayGame.all.dropFirst(row * 2).prefix(2)), scale: s,
+                                  liftedGame: selection, slotFrames: slotFrames) { game in
+                            if game.id == "kart" {
+                                liftsIn = true
+                                selection = game.id
+                            } else {
+                                unavailableGame = game
+                            }
                         }
                     }
                 }
@@ -137,35 +153,202 @@ private struct DisplayGame: Identifiable {
     ]
 }
 
+/// Where each case sits on the shelf. Not observed: it's only read when a case flies back.
+private final class SlotFrames {
+    var frames: [String: CGRect] = [:]
+}
+
+private struct GameCase: View {
+    let game: DisplayGame
+    let scale: CGFloat
+    var body: some View {
+        Image(game.id)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .padding(2 * scale)
+            .background(Color(white: 0.96))
+            .clipShape(RoundedRectangle(cornerRadius: 2 * scale))
+            .overlay {
+                RoundedRectangle(cornerRadius: 2 * scale)
+                    .strokeBorder(Color.white.opacity(0.65), lineWidth: scale)
+            }
+            .overlay(alignment: .leading) {
+                LinearGradient(colors: [.black.opacity(0.22), .white.opacity(0.45), .clear], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: 5 * scale)
+            }
+            .shadow(color: .black.opacity(0.4), radius: 3 * scale, x: 4 * scale, y: 4 * scale)
+    }
+}
+
+/// The chosen game, lifted off its shelf into the middle of the dimmed store until the device opens.
+/// It follows the finger; letting go far enough away, or flicking it, puts it back on the shelf.
+private struct LiftedCase: View {
+    let game: DisplayGame
+    let caseWidth: CGFloat
+    let slotFrame: () -> CGRect?
+    let onPutBack: () -> Void
+
+    @State private var isLifted: Bool
+    @State private var drag = CGSize.zero
+    @State private var isPuttingBack = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let putBackDistance: CGFloat = 110
+    private static let flickSpeed: CGFloat = 700
+
+    init(game: DisplayGame, caseWidth: CGFloat, liftsIn: Bool,
+         slotFrame: @escaping () -> CGRect?, onPutBack: @escaping () -> Void) {
+        self.game = game
+        self.caseWidth = caseWidth
+        self.slotFrame = slotFrame
+        self.onPutBack = onPutBack
+        _isLifted = State(initialValue: !liftsIn)
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let origin = proxy.frame(in: .global).origin
+            let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
+            let slot = slotCenter(in: origin) ?? center
+            let caseHeight = caseWidth * 0.95
+            let liftedScale = min(proxy.size.width * 0.6 / caseWidth, proxy.size.height * 0.45 / caseHeight)
+            // Dragging away loosens the store's hold on the case: it shrinks a little and the dim lifts.
+            let pull = min(1, hypot(drag.width, drag.height) / 300)
+            // Under Reduce Motion the case only fades in and out, in the middle.
+            let isCentered = isLifted || reduceMotion
+
+            ZStack {
+                Color.black
+                    .opacity(isLifted ? 0.7 * (1 - 0.5 * pull) : 0)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture { putBack(center: center, origin: origin) }
+                    .accessibilityHidden(true)
+
+                hint
+                    .position(x: center.x, y: center.y + caseHeight * liftedScale / 2 + 48)
+
+                GameCase(game: game, scale: caseWidth / 150)
+                    .frame(width: caseWidth)
+                    .scaleEffect(isCentered ? liftedScale * (1 - 0.15 * pull) : 1)
+                    .shadow(color: .black.opacity(isLifted ? 0.45 : 0), radius: isLifted ? 24 : 0, y: isLifted ? 16 : 0)
+                    .opacity(isLifted || !reduceMotion ? 1 : 0)
+                    .position(isCentered ? center : slot)
+                    .offset(drag)
+                    .gesture(
+                        DragGesture()
+                            .onChanged { drag = $0.translation }
+                            .onEnded { release($0, center: center, origin: origin) }
+                    )
+                    .allowsHitTesting(!isPuttingBack)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(game.title)
+                    .accessibilityValue("Ready to play")
+                    .accessibilityHint("Open iPhone to play.")
+                    .accessibilityAction(named: "Put Back on Shelf") { putBack(center: center, origin: origin) }
+                    .accessibilityAction(.escape) { putBack(center: center, origin: origin) }
+            }
+            .accessibilityAddTraits(.isModal)
+        }
+        .sensoryFeedback(.impact(weight: .light), trigger: isLifted)
+        .onAppear {
+            guard !isLifted else { return }
+            withAnimation(reduceMotion ? .easeOut(duration: 0.25) : .spring(duration: 0.5, bounce: 0)) {
+                isLifted = true
+            }
+        }
+    }
+
+    private var hint: some View {
+        let isShown = isLifted && drag == .zero && !isPuttingBack
+        return VStack(spacing: 6) {
+            Text("Open to Play")
+                .font(.title2.weight(.semibold))
+                .fontDesign(.rounded)
+            Text("Or drag the case back to the shelf")
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.6))
+        }
+        .foregroundStyle(.white)
+        .multilineTextAlignment(.center)
+        .fixedSize()
+        // Arrives once the case has landed; gets out of the way as soon as it's grabbed.
+        .opacity(isShown ? 1 : 0)
+        .animation(isShown ? .easeOut(duration: 0.3).delay(0.25) : .easeOut(duration: 0.15), value: isShown)
+        .accessibilityHidden(true)
+    }
+
+    /// Read fresh each time: the shelf may have laid out since this view last updated.
+    private func slotCenter(in origin: CGPoint) -> CGPoint? {
+        slotFrame().map { CGPoint(x: $0.midX - origin.x, y: $0.midY - origin.y) }
+    }
+
+    private func release(_ value: DragGesture.Value, center: CGPoint, origin: CGPoint) {
+        let travel = value.translation
+        let velocity = value.velocity
+        let isFlickedAway = hypot(velocity.width, velocity.height) > Self.flickSpeed
+            && velocity.width * travel.width + velocity.height * travel.height > 0
+        if hypot(travel.width, travel.height) > Self.putBackDistance || isFlickedAway {
+            putBack(center: center, origin: origin, velocity: velocity)
+            return
+        }
+
+        // Spring back to the middle, carrying the finger's speed (as a fraction of the way back per second).
+        let distanceSquared = travel.width * travel.width + travel.height * travel.height
+        let speed = distanceSquared > 1 ? -(velocity.width * travel.width + velocity.height * travel.height) / distanceSquared : 0
+        withAnimation(reduceMotion ? .easeOut(duration: 0.2)
+                      : .interpolatingSpring(duration: 0.35, bounce: 0.25, initialVelocity: min(max(speed, -10), 10))) {
+            drag = .zero
+        }
+    }
+
+    private func putBack(center: CGPoint, origin: CGPoint, velocity: CGSize = .zero) {
+        guard !isPuttingBack else { return }
+        isPuttingBack = true
+
+        let animation: Animation
+        if reduceMotion {
+            animation = .easeOut(duration: 0.2)
+        } else {
+            // Leave the finger at its speed, projected onto the flight back to the slot.
+            let slot = slotCenter(in: origin) ?? center
+            let path = CGSize(width: slot.x - center.x - drag.width, height: slot.y - center.y - drag.height)
+            let distanceSquared = path.width * path.width + path.height * path.height
+            let speed = distanceSquared > 1 ? (velocity.width * path.width + velocity.height * path.height) / distanceSquared : 0
+            animation = .interpolatingSpring(duration: 0.45, bounce: 0, initialVelocity: min(max(speed, 0), 10))
+        }
+
+        withAnimation(animation, completionCriteria: .logicallyComplete) {
+            isLifted = false
+            if !reduceMotion { drag = .zero }
+        } completion: {
+            onPutBack()
+        }
+    }
+}
+
 private struct GameShelf: View {
     let games: [DisplayGame]
     let scale: CGFloat
+    let liftedGame: String?
+    let slotFrames: SlotFrames
     let onSelect: (DisplayGame) -> Void
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .bottom, spacing: 30 * scale) {
                 ForEach(games) { game in
                     Button { onSelect(game) } label: {
-                        Image(game.id)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .padding(2 * scale)
-                        .background(Color(white: 0.96))
-                        .clipShape(RoundedRectangle(cornerRadius: 2 * scale))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 2 * scale)
-                                .strokeBorder(Color.white.opacity(0.65), lineWidth: scale)
-                        }
-                        .overlay(alignment: .leading) {
-                            LinearGradient(colors: [.black.opacity(0.22), .white.opacity(0.45), .clear], startPoint: .leading, endPoint: .trailing)
-                                .frame(width: 5 * scale)
-                        }
-                        .shadow(color: .black.opacity(0.4), radius: 3 * scale, x: 4 * scale, y: 4 * scale)
+                        GameCase(game: game, scale: scale)
                     }
                     .frame(width: 150 * scale)
                     .buttonStyle(.plain)
+                    // The lifted case is drawn above the store; leave its spot empty.
+                    .opacity(liftedGame == game.id ? 0 : 1)
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                        slotFrames.frames[game.id] = $0
+                    }
                     .accessibilityLabel(game.title)
-                    .accessibilityHint(game.id == "kart" ? "Play the bundled game" : "Show game availability")
+                    .accessibilityHint(game.id == "kart" ? "Takes the game off the shelf, ready to play" : "Shows game availability")
                 }
                 if games.count == 1 {
                     Color.clear.frame(width: 150 * scale, height: 1)
@@ -246,4 +429,4 @@ private struct Grain: View {
     }
 }
 
-#Preview { GameSelectionView() }
+#Preview { GameSelectionView(selection: .constant(nil)) }

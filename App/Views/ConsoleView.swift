@@ -10,15 +10,15 @@ enum Palette {
     static let buttonLabel = Color(red: 0.61, green: 0.62, blue: 0.58)
     static let ledOn = Color(red: 0.48, green: 0.88, blue: 0.25)
     static let ledOff = Color(white: 0.42)
+    static let screenOff = Color(red: 0.13, green: 0.14, blue: 0.13)
 }
 
 /// Keep the console attached to the physical display, independent of interface rotation.
 struct ConsoleView: View {
     let emulator: DSEmulator
-    let onReturnToShelf: () -> Void
 
     var body: some View {
-        PhysicalConsole(emulator: emulator, onReturnToShelf: onReturnToShelf)
+        PhysicalConsole(emulator: emulator)
             .ignoresSafeArea()
             .statusBarHidden()
             .persistentSystemOverlays(.hidden)
@@ -28,10 +28,9 @@ struct ConsoleView: View {
 
 private struct PhysicalConsole: UIViewControllerRepresentable {
     let emulator: DSEmulator
-    let onReturnToShelf: () -> Void
 
     func makeUIViewController(context: Context) -> PhysicalConsoleController {
-        PhysicalConsoleController(emulator: emulator, onReturnToShelf: onReturnToShelf)
+        PhysicalConsoleController(emulator: emulator)
     }
 
     func updateUIViewController(_ controller: PhysicalConsoleController, context: Context) {}
@@ -40,8 +39,8 @@ private struct PhysicalConsole: UIViewControllerRepresentable {
 private final class PhysicalConsoleController: UIViewController {
     private let console: UIHostingController<ConsoleBody>
 
-    init(emulator: DSEmulator, onReturnToShelf: @escaping () -> Void) {
-        console = UIHostingController(rootView: ConsoleBody(emulator: emulator, onReturnToShelf: onReturnToShelf))
+    init(emulator: DSEmulator) {
+        console = UIHostingController(rootView: ConsoleBody(emulator: emulator))
         super.init(nibName: nil, bundle: nil)
         console.safeAreaRegions = []
     }
@@ -101,7 +100,6 @@ private final class PhysicalConsoleController: UIViewController {
 /// In hardware coordinates the two equal panels meet at the physical fold.
 private struct ConsoleBody: View {
     let emulator: DSEmulator
-    let onReturnToShelf: () -> Void
 
     var body: some View {
         GeometryReader { proxy in
@@ -117,7 +115,7 @@ private struct ConsoleBody: View {
             ZStack {
                 VStack(spacing: 0) {
                     TopHalf(emulator: emulator, screenWidth: screenWidth, scale: scale,
-                            topInset: proxy.safeAreaInsets.top, onReturnToShelf: onReturnToShelf)
+                            topInset: proxy.safeAreaInsets.top)
                         .frame(height: halfHeight)
                     BottomHalf(emulator: emulator, screenWidth: screenWidth, scale: scale,
                                bottomInset: bottomInset)
@@ -169,7 +167,6 @@ private struct TopHalf: View {
     let screenWidth: CGFloat
     let scale: CGFloat
     let topInset: CGFloat
-    let onReturnToShelf: () -> Void
 
     var body: some View {
         ZStack {
@@ -178,26 +175,18 @@ private struct TopHalf: View {
                 HStack {
                     RubberFoot(scale: scale)
                     Spacer()
-                    Button(action: onReturnToShelf) {
-                        Label("Shelf", systemImage: "chevron.left")
-                            .font(.system(size: 12 * scale, weight: .medium))
-                            .foregroundStyle(Palette.engraving)
-                            .padding(.horizontal, 12 * scale)
-                            .frame(minWidth: 60, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Return to shelf")
-                    .accessibilityHint("Pauses the game")
-                    Spacer()
                     RubberFoot(scale: scale)
                 }
                 Spacer(minLength: 10 * scale)
                 HStack(spacing: 0) {
                     SpeakerGrill(scale: scale).frame(maxWidth: .infinity)
                     Screen(width: screenWidth, scale: scale) {
-                        ScreenView(renderer: emulator.screenRenderer, screenIndex: 0)
-                            .overlay { StatusOverlay(status: emulator.status, scale: scale) }
+                        if emulator.status == .stopped {
+                            Palette.screenOff
+                        } else {
+                            ScreenView(renderer: emulator.screenRenderer, screenIndex: 0)
+                                .overlay { StatusOverlay(status: emulator.status, scale: scale) }
+                        }
                     }
                     SpeakerGrill(scale: scale).frame(maxWidth: .infinity)
                 }
@@ -304,8 +293,13 @@ private struct BottomHalf: View {
             Shell(scale: scale)
             VStack(spacing: 12 * scale) {
                 Screen(width: screenWidth, scale: scale) {
-                    ScreenView(renderer: emulator.screenRenderer, screenIndex: 1)
-                        .overlay { TouchSurface(emulator: emulator) }
+                    // Without a game inserted, the console stays off.
+                    if emulator.status == .stopped {
+                        Palette.screenOff
+                    } else {
+                        ScreenView(renderer: emulator.screenRenderer, screenIndex: 1)
+                            .overlay { TouchSurface(emulator: emulator) }
+                    }
                 }
                 HStack(alignment: .center, spacing: 0) {
                     DPad(emulator: emulator, size: 104 * scale)

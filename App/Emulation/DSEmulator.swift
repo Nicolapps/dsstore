@@ -85,6 +85,16 @@ final class DSEmulator {
         status = .running
     }
 
+    /// Ejects the game, saving it first; the next `start()` boots it from scratch.
+    func stop() {
+        if let core {
+            core.stop()
+            bridge.resetInputs()
+            self.core = nil
+        }
+        status = .stopped
+    }
+
     // MARK: - Input
 
     func press(_ button: DSButton) {
