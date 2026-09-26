@@ -70,6 +70,7 @@ final class DSEmulator {
         }
 
         core.updateHandler = Self.frameHandler(uploadingTo: screenRenderer)
+        core.audioManager.respectsSilentMode = false
         core.start()
         if isMuted { core.audioManager.isEnabled = false }
 
