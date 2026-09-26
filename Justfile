@@ -6,8 +6,12 @@ bundle_id := "com.nicolasettlin.dsstore"
 derived_data := "build/DerivedData"
 app := derived_data / "Build/Products/Debug-iphonesimulator/DSStore.app"
 
-# Simulator to build for and run on; override with `just simulator="iPhone 17" run`.
-simulator := "iPhone 18 Pro"
+# This project only builds with the Xcode 27.1 beta, regardless of `xcode-select`.
+xcode := "/Applications/Xcode 27.1.app"
+export DEVELOPER_DIR := xcode / "Contents/Developer"
+
+# Simulator to build for and run on; override with `just simulator="iPhone 18 Pro" run`.
+simulator := "iPhone Duo"
 
 # List available recipes.
 default:
@@ -24,7 +28,7 @@ generate:
 # Open the project in Xcode, generating it first if needed.
 open:
     [ -d {{ project }} ] || just bootstrap
-    open {{ project }}
+    open -a '{{ xcode }}' {{ project }}
 
 # Build the app for the simulator.
 build: _project
@@ -32,23 +36,23 @@ build: _project
         -project {{ project }} \
         -scheme {{ scheme }} \
         -configuration Debug \
-        -destination 'platform=iOS Simulator,name={{ simulator }}' \
+        -destination "platform=iOS Simulator,id=$(just simulator='{{ simulator }}' _udid)" \
         -derivedDataPath {{ derived_data }} \
         | {{ if `command -v xcbeautify || true` != "" { "xcbeautify" } else { "cat" } }}
 
 # Build, install and launch the app on the simulator, streaming its console output.
 run: build boot
-    xcrun simctl install '{{ simulator }}' {{ app }}
-    xcrun simctl launch --console-pty --terminate-running-process '{{ simulator }}' {{ bundle_id }}
+    xcrun simctl install "$(just simulator='{{ simulator }}' _udid)" {{ app }}
+    xcrun simctl launch --console-pty --terminate-running-process "$(just simulator='{{ simulator }}' _udid)" {{ bundle_id }}
 
 # Boot the simulator and bring the Simulator app to the front.
 boot:
-    xcrun simctl boot '{{ simulator }}' 2>/dev/null || true
-    open -a Simulator
+    xcrun simctl boot "$(just simulator='{{ simulator }}' _udid)" 2>/dev/null || true
+    open -a "$DEVELOPER_DIR/Applications/Simulator.app"
 
 # Uninstall the app from the simulator (also clears its save data).
 uninstall:
-    xcrun simctl uninstall '{{ simulator }}' {{ bundle_id }}
+    xcrun simctl uninstall "$(just simulator='{{ simulator }}' _udid)" {{ bundle_id }}
 
 # Symlink a game into ROM/ so it gets bundled into the app.
 rom path:
@@ -87,3 +91,10 @@ simulators:
 
 _project:
     [ -d {{ project }} ] || just bootstrap
+
+# Print the UDID of the simulator named `simulator`, preferring the newest iOS runtime.
+# Resolving by UDID keeps every recipe on the same device when several share a name.
+_udid:
+    @xcrun simctl list devices available -j \
+        | jq -er --arg name '{{ simulator }}' \
+            '[.devices | to_entries | sort_by(.key) | reverse | .[].value[] | select(.name == $name)][0].udid // error("no available simulator named \($name)")'
