@@ -11,3 +11,5 @@ ROM/*
 !ROM/README.md
 *.nds
 *.dsv
+*.zip
+*.7z

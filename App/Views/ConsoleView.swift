@@ -120,7 +120,7 @@ private struct StatusOverlay: View {
 
     private var message: String? {
         switch status {
-        case .missingROM: "No game found.\nPut a ROM at ROM/game.nds and rebuild."
+        case .missingROM: "No game found.\nPut a ROM at ROM/game.nds\n(or game.zip) and rebuild."
         case .failed(let reason): reason
         case .stopped, .running, .paused: nil
         }

@@ -55,12 +55,15 @@ targets:
       - name: Bundle ROM
         basedOnDependencyAnalysis: false
         script: |
-          # Copies ROM/game.nds (following symlinks) into the app bundle.
-          ROM="${SRCROOT}/ROM/game.nds"
+          # Copies ROM/game.nds, or the .nds inside ROM/game.zip, into the app bundle (symlinks are followed).
+          NDS="${SRCROOT}/ROM/game.nds"
+          ZIP="${SRCROOT}/ROM/game.zip"
           DEST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/game.nds"
-          if [ -e "$ROM" ]; then
-            cp -L "$ROM" "$DEST"
+          if [ -e "$NDS" ]; then
+            cp -L "$NDS" "$DEST"
+          elif [ -e "$ZIP" ]; then
+            unzip -p "$ZIP" '*.nds' > "$DEST"
           else
-            echo "warning: No ROM found at ROM/game.nds; the app will show a placeholder."
+            echo "warning: No ROM found at ROM/game.nds or ROM/game.zip; the app will show a placeholder."
             rm -f "$DEST"
           fi
