@@ -327,15 +327,17 @@ private struct OpeningCase: View {
                         .scaleEffect(x: -1)
                         .opacity(openness < 0.5 ? 0 : 1)
                 }
-                .brightness(-0.3 * turn)
+                // Shaded in proportion, so the dark plastic inside doesn't go black.
+                .colorMultiply(Color(white: 1 - 0.25 * turn))
                 .rotation3DEffect(.degrees(-180 * openness), axis: (x: 0, y: 1, z: 0),
                                   anchor: .leading, perspective: 0.45)
             }
     }
 }
 
-private let casePlastic = LinearGradient(colors: [Color(white: 0.25), Color(white: 0.13)],
-                                         startPoint: .topLeading, endPoint: .bottomTrailing)
+/// Lit from above, so the two halves of an open case carry on into each other across the spine.
+private let casePlastic = LinearGradient(colors: [Color(white: 0.25), Color(white: 0.15)],
+                                         startPoint: .top, endPoint: .bottom)
 
 /// The inside of the case: a molded well holding the card.
 private struct CaseTray: View {
