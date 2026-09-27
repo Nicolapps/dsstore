@@ -55,9 +55,20 @@ struct GameSelectionView: View {
                             }
                         }
                     }
+                    // The last shelf shades the board below it too, which shows in the overscroll.
+                    Color.clear
+                        .frame(height: 20 * s)
+                        .overlay(alignment: .top) {
+                            LinearGradient(stops: [
+                                .init(color: .black.opacity(0.5), location: 0),
+                                .init(color: .black.opacity(0.22), location: 0.3),
+                                .init(color: .clear, location: 1)
+                            ], startPoint: .top, endPoint: .bottom)
+                                .frame(height: 70 * s)
+                        }
+                        .allowsHitTesting(false)
                 }
                 .padding(.top, 10 * s)
-                .padding(.bottom, 20 * s)
                 // The board scrolls with the shelves, and runs on past both ends for the rubber-band overscroll.
                 .background { Pegboard().padding(.vertical, -800 * s) }
             }
@@ -363,8 +374,8 @@ private struct GameShelf: View {
             // and darkens again into the corner behind the shelf.
             .background {
                 LinearGradient(stops: [
-                    .init(color: .black.opacity(isUnderShelf ? 0.5 : 0.05), location: 0),
-                    .init(color: .black.opacity(isUnderShelf ? 0.22 : 0.02), location: 0.12),
+                    .init(color: .black.opacity(isUnderShelf ? 0.5 : 0), location: 0),
+                    .init(color: .black.opacity(isUnderShelf ? 0.22 : 0.01), location: 0.12),
                     .init(color: .black.opacity(0.03), location: 0.4),
                     .init(color: .black.opacity(0.08), location: 0.7),
                     .init(color: .black.opacity(0.3), location: 1)
