@@ -4,7 +4,7 @@ import SwiftUI
 /// flies out of it into the slot of a console lid that slides in to meet it, while the empty case goes back on
 /// the shelf. The lid is the size of the display, as if the device itself were the closed console.
 /// Putting the game back, by tapping outside or pulling the card out, slides the card out of the slot and the console away;
-/// pushing the console away instead takes the card with it.
+/// pushing the console away instead slides it off the card, which then goes the other way.
 struct CartridgeInsertion: View {
     let game: DisplayGame
     /// The width of a case on the shelf; every pose of the case scales from it.
@@ -22,7 +22,7 @@ struct CartridgeInsertion: View {
     @State private var pull: CGFloat = 0
     /// Let go of while being pulled out, so it leaves at speed instead of starting slowly.
     @State private var isFlung = false
-    /// How far the console has been pushed away, towards the right, with the card still in it.
+    /// How far the console has been pushed away, towards the right, sliding off the card.
     @State private var shove: CGFloat = 0
     /// Only used under Reduce Motion, where the whole scene fades instead of playing out.
     @State private var opacity: Double
@@ -113,25 +113,26 @@ struct CartridgeInsertion: View {
         shove = translation > 0 ? translation : -min(6, -translation * 0.08)
     }
 
-    /// Pushed away, the console carries on off screen at the speed it was let go of, the card still in its slot.
+    /// Pushed away, the console carries on off screen at the speed it was let go of,
+    /// while the card it left behind goes back the way it came.
     private func releaseConsole(_ pushingAway: Bool, velocity: CGFloat, layout: StageLayout) {
         guard pushingAway else {
-            withAnimation(.spring(duration: 0.3, bounce: 0.25)) { shove = 0 }
+            let wasOff = shove > layout.cardSlideLength
+            withAnimation(.spring(duration: 0.3, bounce: 0.25)) {
+                shove = 0
+            } completion: {
+                if wasOff { clicks += 1 }
+            }
             return
         }
-        guard !reduceMotion else {
-            putBack()
-            return
-        }
-        isPuttingBack = true
-        ejects += 1
-        let target = layout.shoveAwayOffset
+        let target = layout.lidAwayOffset - layout.lidRestOffset
         let remaining = max(1, target - shove)
-        withAnimation(.interpolatingSpring(duration: 0.45, bounce: 0, initialVelocity: max(0, velocity) / remaining)) {
-            shove = target
-        } completion: {
-            onPutBack()
+        if !reduceMotion {
+            withAnimation(.interpolatingSpring(duration: 0.45, bounce: 0, initialVelocity: max(0, velocity) / remaining)) {
+                shove = target
+            }
         }
+        putBack()
     }
 
     private func putBack() {
@@ -200,8 +201,6 @@ private struct StageLayout {
     /// The lid rests just far enough right of the display to show the half of the card sticking out.
     var lidRestOffset: CGFloat { cardLength / 2 + 20 }
     var lidAwayOffset: CGFloat { size.width + 40 }
-    /// Far enough for the lid and the card sticking out of it to both be off screen.
-    var shoveAwayOffset: CGFloat { size.width - lidRestOffset + cardLength + 40 }
 
     /// Across the card, which lies on its side to go into the slot.
     var cardWidth: CGFloat { size.height * 0.19 }
@@ -247,9 +246,7 @@ private struct InsertionStage: View, Animatable {
     }
 
     private var dim: Double {
-        let shoved = min(max(Double(shove / layout.shoveAwayOffset), 0), 1)
-        return 0.7 * easeInOut(insertion.through(Beat.dim)) * (1 - easeInOut(ejection.through(EjectBeat.dim)))
-            * (1 - easeOut(shoved))
+        0.7 * easeInOut(insertion.through(Beat.dim)) * (1 - easeInOut(ejection.through(EjectBeat.dim)))
     }
 
     /// Where the lid has got to on its way in.
@@ -258,7 +255,7 @@ private struct InsertionStage: View, Animatable {
     }
 
     private var lidOffset: CGFloat {
-        mix(arrivingLidOffset, layout.lidAwayOffset, easeIn(ejection.through(EjectBeat.lid))) + shove
+        mix(arrivingLidOffset + shove, layout.lidAwayOffset, easeIn(ejection.through(EjectBeat.lid)))
     }
 
     var body: some View {
@@ -305,7 +302,8 @@ private struct InsertionStage: View, Animatable {
     }
 
     private var lid: some View {
-        ConsoleLid(isPoweredOn: insertion >= Beat.card.upperBound && ejection == 0,
+        // Off once it's been pushed clear of the card.
+        ConsoleLid(isPoweredOn: insertion >= Beat.card.upperBound && ejection == 0 && shove < layout.cardSlideLength,
                    cardWidth: layout.cardWidth)
             .shadow(color: .black.opacity(0.5), radius: 24, x: -6)
             .offset(x: lidOffset)
@@ -367,8 +365,6 @@ private struct InsertionStage: View, Animatable {
         let ejecting = ejection.through(EjectBeat.card)
         let ejected = isFlung ? 1 - (1 - ejecting) * (1 - ejecting) : easeIn(ejecting)
         center.x -= pull + ejected * (seated.x - pull + layout.cardLength / 2 + 20)
-        // Pushed away with the console, still in its slot.
-        center.x += shove
 
         return GameCard(game: game)
             .frame(width: GameCard.width, height: GameCard.width * GameCard.aspect)
