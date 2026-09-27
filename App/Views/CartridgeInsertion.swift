@@ -552,38 +552,48 @@ private struct ConsoleLid: View {
                     .stroke(LinearGradient(colors: [.white, .black.opacity(0.2)],
                                            startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.2)
                     .padding(0.6)
-                VStack(spacing: 0) {
-                    knuckle(outerEnd: .top)
-                        .overlay(alignment: .bottom) {
-                            IndicatorLights(axis: .vertical, isOn: isPoweredOn, scale: Self.hingeScale)
-                                .padding(.bottom, 7)
-                        }
-                    slot.frame(height: cardWidth * 1.08)
-                    knuckle(outerEnd: .bottom)
-                }
-                .padding(.vertical, size.height * 0.07)
+                hinge(scale: size.height / Self.hingeLength)
             }
         }
     }
 
-    /// The hinge's knuckles, at the size of the open console's (whose barrel is about 40 units thick).
-    private static let knuckleWidth: CGFloat = 22
-    private static let hingeScale: CGFloat = knuckleWidth / 40
+    /// The open console's hinge runs 605 of its units across; the lid's fold edge is the same hinge,
+    /// so measuring it in those units keeps every part the size it is on the open console.
+    private static let hingeLength: CGFloat = 605
 
-    private func knuckle(outerEnd: Edge) -> some View {
-        HingeBarrel(axis: .vertical, outerEnd: outerEnd, scale: Self.hingeScale)
-            .frame(width: Self.knuckleWidth)
-            .shadow(color: .black.opacity(0.18), radius: 1.5, x: 1.5)
+    /// The knuckles on the base cap both ends; between them runs the lid's own barrel, flush with it,
+    /// with the card slot's mouth below its edge.
+    private func hinge(scale: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            knuckle(outerEnd: .top, scale: scale)
+                .overlay(alignment: .bottom) {
+                    IndicatorLights(axis: .vertical, isOn: isPoweredOn, scale: scale)
+                        .padding(.bottom, 9 * scale)
+                }
+                .zIndex(1)
+            HingeBarrel(axis: .vertical, outerEnd: nil, scale: scale)
+                .padding(.horizontal, 2.5 * scale)
+                .overlay(alignment: .leading) { slot(scale: scale) }
+            knuckle(outerEnd: .bottom, scale: scale)
+                .zIndex(1)
+        }
+        .frame(width: 42 * scale)
+        .padding(.vertical, 3 * scale)
     }
 
-    private var slot: some View {
-        HStack(spacing: 0) {
-            RoundedRectangle(cornerRadius: 1.5)
-                .fill(Color(white: 0.1))
-                .frame(width: 6)
-                .overlay(alignment: .trailing) { Rectangle().fill(.white.opacity(0.5)).frame(width: 0.6).offset(x: 0.6) }
-            Spacer(minLength: 0)
-        }
-        .frame(width: Self.knuckleWidth)
+    private func knuckle(outerEnd: Edge, scale: CGFloat) -> some View {
+        HingeBarrel(axis: .vertical, outerEnd: outerEnd, scale: scale)
+            .frame(height: 50 * scale)
+            .shadow(color: .black.opacity(0.2), radius: 1.5 * scale, x: 1.5 * scale)
+    }
+
+    /// The mouth of the card slot, in the base just below the barrel's edge.
+    private func slot(scale: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: 1.5)
+            .fill(Color(white: 0.1))
+            .frame(width: 4 * scale, height: cardWidth * 1.08)
+            .overlay(alignment: .trailing) {
+                Rectangle().fill(.black.opacity(0.25)).frame(width: 2 * scale).blur(radius: scale).offset(x: 2 * scale)
+            }
     }
 }
