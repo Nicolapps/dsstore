@@ -57,8 +57,8 @@ struct GameSelectionView: View {
                         }
                     }
                 }
-                .padding(.top, 18 * s)
-                .padding(.bottom, 12 * s)
+                .padding(.top, 10 * s)
+                .padding(.bottom, 20 * s)
                 .background {
                     GeometryReader { content in
                         Color.clear.preference(key: ShelfOffsetKey.self,
@@ -298,7 +298,9 @@ private struct GameShelf: View {
             }
             .padding(.horizontal, 18 * scale)
             .padding(.top, 8 * scale)
-            .frame(height: 158 * scale, alignment: .bottom)
+            // The gap under the shelf above is part of this bay, so its lighting starts right under that shelf.
+            .frame(maxWidth: .infinity)
+            .frame(height: 166 * scale, alignment: .bottom)
             // Light from above: the shelf overhead shades the board, which brightens further down
             // and darkens again into the corner behind the shelf.
             .background {
@@ -331,7 +333,6 @@ private struct GameShelf: View {
             .shadow(color: .black.opacity(0.25), radius: 6 * scale, y: 8 * scale)
             .zIndex(1)
         }
-        .padding(.bottom, 8 * scale)
     }
 }
 
