@@ -2,8 +2,6 @@ import SwiftUI
 
 enum Palette {
     static let background = Color(white: 0.17)
-    static let shellLight = Color(red: 0.99, green: 0.99, blue: 0.98)
-    static let shellDark = Color(red: 0.82, green: 0.83, blue: 0.83)
     static let engraving = Color(white: 0.64)
     static let ledOn = Color(red: 0.48, green: 0.88, blue: 0.25)
     static let ledOff = Color(red: 0.8, green: 0.81, blue: 0.78)
@@ -133,7 +131,7 @@ private struct Shell: View {
 
 /// A soft window reflection across the polished white plastic: a broad glow in the upper corner
 /// and a narrower diagonal band, fading toward the far corner.
-private struct Gloss: View {
+struct Gloss: View {
     var body: some View {
         LinearGradient(stops: [
             .init(color: .white.opacity(0.6), location: 0),
@@ -264,21 +262,25 @@ private struct Hinge: View {
     }
 }
 
-/// A glossy white cylinder seen side-on, lit from above. Only a free end is rounded; where it meets
-/// another part it's cut square, with a fine shadowed seam.
-private struct HingeBarrel: View {
-    let outerEnd: HorizontalEdge?
+/// A glossy white cylinder seen side-on, lit from above (or from the left, when it stands upright).
+/// Only a free end is rounded; where it meets another part it's cut square, with a fine shadowed seam.
+struct HingeBarrel: View {
+    var axis: Axis = .horizontal
+    /// The end that is free, rather than butting against another part of the hinge.
+    let outerEnd: Edge?
     let scale: CGFloat
 
     var body: some View {
         let radius = 11 * scale
+        let rounds = { (edges: Set<Edge>) in outerEnd.map(edges.contains) == true ? radius : 0 }
         let shape = UnevenRoundedRectangle(
-            topLeadingRadius: outerEnd == .leading ? radius : 0,
-            bottomLeadingRadius: outerEnd == .leading ? radius : 0,
-            bottomTrailingRadius: outerEnd == .trailing ? radius : 0,
-            topTrailingRadius: outerEnd == .trailing ? radius : 0,
+            topLeadingRadius: rounds([.leading, .top]),
+            bottomLeadingRadius: rounds([.leading, .bottom]),
+            bottomTrailingRadius: rounds([.trailing, .bottom]),
+            topTrailingRadius: rounds([.trailing, .top]),
             style: .continuous
         )
+        let isHorizontal = axis == .horizontal
         shape
             .fill(LinearGradient(stops: [
                 .init(color: Color(white: 0.78), location: 0),
@@ -288,41 +290,53 @@ private struct HingeBarrel: View {
                 .init(color: Color(white: 0.9), location: 0.66),
                 .init(color: Color(white: 0.8), location: 0.86),
                 .init(color: Color(white: 0.68), location: 1)
-            ], startPoint: .top, endPoint: .bottom))
+            ], startPoint: isHorizontal ? .top : .leading, endPoint: isHorizontal ? .bottom : .trailing))
             .overlay {
-                // The sharp reflection of the light running along the top of the barrel.
-                Rectangle()
-                    .fill(.white)
-                    .frame(height: 1.8 * scale)
-                    .blur(radius: 0.6 * scale)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .padding(.top, 9 * scale)
+                // The sharp reflection of the light running along the barrel.
+                GeometryReader { proxy in
+                    let thickness = isHorizontal ? proxy.size.height : proxy.size.width
+                    Rectangle()
+                        .fill(.white)
+                        .frame(width: isHorizontal ? nil : 1.8 * scale, height: isHorizontal ? 1.8 * scale : nil)
+                        .blur(radius: 0.6 * scale)
+                        .offset(x: isHorizontal ? 0 : thickness * 0.24, y: isHorizontal ? thickness * 0.24 : 0)
+                }
             }
             .overlay {
                 // A free end rolls out of the light; a cut end shows as a crisp seam.
-                HStack(spacing: 0) {
-                    end(outerEnd == .leading, towardTrailing: false)
+                let layout = isHorizontal ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+                layout {
+                    end(atFarEnd: false)
                     Spacer(minLength: 0)
-                    end(outerEnd == .trailing, towardTrailing: true)
+                    end(atFarEnd: true)
                 }
             }
             .clipShape(shape)
             .overlay { shape.stroke(.black.opacity(0.14), lineWidth: 0.6) }
     }
 
-    @ViewBuilder private func end(_ isFree: Bool, towardTrailing: Bool) -> some View {
-        if isFree {
-            LinearGradient(colors: [.black.opacity(0.22), .clear],
-                           startPoint: towardTrailing ? .trailing : .leading,
-                           endPoint: towardTrailing ? .leading : .trailing)
-                .frame(width: 10 * scale)
+    @ViewBuilder private func end(atFarEnd: Bool) -> some View {
+        let isHorizontal = axis == .horizontal
+        let edge: Edge = isHorizontal ? (atFarEnd ? .trailing : .leading) : (atFarEnd ? .bottom : .top)
+        let outside: UnitPoint = isHorizontal ? (atFarEnd ? .trailing : .leading) : (atFarEnd ? .bottom : .top)
+        let inside: UnitPoint = isHorizontal ? (atFarEnd ? .leading : .trailing) : (atFarEnd ? .top : .bottom)
+        if outerEnd == edge {
+            LinearGradient(colors: [.black.opacity(0.22), .clear], startPoint: outside, endPoint: inside)
+                .frame(width: isHorizontal ? 10 * scale : nil, height: isHorizontal ? nil : 10 * scale)
         } else {
-            HStack(spacing: 0) {
-                if towardTrailing { Rectangle().fill(.white.opacity(0.8)).frame(width: 0.6 * scale) }
-                Rectangle().fill(.black.opacity(0.22)).frame(width: 0.8 * scale)
-                if !towardTrailing { Rectangle().fill(.white.opacity(0.8)).frame(width: 0.6 * scale) }
+            let layout = isHorizontal ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+            layout {
+                if atFarEnd { seamLine(.white.opacity(0.8), 0.6) }
+                seamLine(.black.opacity(0.22), 0.8)
+                if !atFarEnd { seamLine(.white.opacity(0.8), 0.6) }
             }
         }
+    }
+
+    private func seamLine(_ color: Color, _ thickness: CGFloat) -> some View {
+        Rectangle().fill(color)
+            .frame(width: axis == .horizontal ? thickness * scale : nil,
+                   height: axis == .horizontal ? nil : thickness * scale)
     }
 }
 
@@ -350,47 +364,55 @@ private struct Microphone: View {
     }
 }
 
-/// The right knuckle's ribbing: fine grooves ringing the barrel, with the power and charge
-/// lamps as translucent bands among them.
-private struct IndicatorLights: View {
+/// A knuckle's ribbing: fine grooves ringing the barrel, with the power and charge lamps as
+/// translucent bands among them. `axis` is the barrel's.
+struct IndicatorLights: View {
+    var axis: Axis = .horizontal
     let isOn: Bool
     let scale: CGFloat
 
+    private var isHorizontal: Bool { axis == .horizontal }
+
     var body: some View {
-        HStack(spacing: 3 * scale) {
+        let layout = isHorizontal ? AnyLayout(HStackLayout(spacing: 3 * scale)) : AnyLayout(VStackLayout(spacing: 3 * scale))
+        layout {
             groove
             groove
             lamp(color: isOn ? Palette.ledOn : nil)
             lamp(color: nil)
         }
-        .padding(.vertical, 2 * scale)
-        // The rings wrap around the cylinder, so they fade out as it curves away at the top and bottom.
+        .padding(isHorizontal ? .vertical : .horizontal, 2 * scale)
+        // The rings wrap around the cylinder, so they fade out as it curves away from view.
         .mask {
             LinearGradient(stops: [
                 .init(color: .clear, location: 0),
                 .init(color: .black, location: 0.3),
                 .init(color: .black, location: 0.72),
                 .init(color: .clear, location: 1)
-            ], startPoint: .top, endPoint: .bottom)
+            ], startPoint: isHorizontal ? .top : .leading, endPoint: isHorizontal ? .bottom : .trailing)
         }
         .accessibilityHidden(true)
     }
 
-    /// A cut into the barrel: its left wall in shadow, its right edge catching the light.
+    /// A cut into the barrel: one wall in shadow, the far edge catching the light.
     private var groove: some View {
-        HStack(spacing: 0) {
-            Rectangle().fill(.black.opacity(0.3)).frame(width: 0.8 * scale)
-            Rectangle().fill(.white).frame(width: 0.7 * scale)
+        let layout = isHorizontal ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+        return layout {
+            band(.black.opacity(0.3), 0.8)
+            band(.white, 0.7)
         }
     }
 
+    private func band(_ style: some ShapeStyle, _ thickness: CGFloat) -> some View {
+        Rectangle().fill(style)
+            .frame(width: isHorizontal ? thickness * scale : nil, height: isHorizontal ? nil : thickness * scale)
+    }
+
     private func lamp(color: Color?) -> some View {
-        Rectangle()
-            .fill(LinearGradient(colors: [(color ?? Palette.ledOff).opacity(0.75), color ?? Palette.ledOff,
-                                          (color ?? Palette.ledOff).opacity(0.8)],
-                                 startPoint: .top, endPoint: .bottom))
-            .overlay(alignment: .leading) { Rectangle().fill(.black.opacity(0.18)).frame(width: 0.5 * scale) }
-            .frame(width: 2.4 * scale)
+        let tint = color ?? Palette.ledOff
+        return band(LinearGradient(colors: [tint.opacity(0.75), tint, tint.opacity(0.8)],
+                                   startPoint: isHorizontal ? .top : .leading,
+                                   endPoint: isHorizontal ? .bottom : .trailing), 2.4)
             .shadow(color: color?.opacity(0.9) ?? .clear, radius: 2.5 * scale)
     }
 }

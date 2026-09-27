@@ -526,43 +526,54 @@ private struct ConsoleLid: View {
             let shell = ConcentricRectangle(corners: .concentric(minimum: .fixed(10)))
             ZStack(alignment: .leading) {
                 shell.fill(LinearGradient(stops: [
-                    .init(color: Palette.shellLight, location: 0),
-                    .init(color: Color(white: 0.95), location: 0.55),
-                    .init(color: Palette.shellDark, location: 1)
+                    .init(color: Color(red: 0.98, green: 0.98, blue: 0.965), location: 0),
+                    .init(color: Color(red: 0.94, green: 0.945, blue: 0.93), location: 0.48),
+                    .init(color: Color(red: 0.89, green: 0.9, blue: 0.89), location: 1)
                 ], startPoint: .topLeading, endPoint: .bottomTrailing))
-                LinearGradient(stops: [
-                    .init(color: .clear, location: 0.2),
-                    .init(color: .white.opacity(0.85), location: 0.3),
-                    .init(color: .clear, location: 0.42)
-                ], startPoint: .topLeading, endPoint: .bottomTrailing)
+                // The same polished plastic as the open console: a window reflection, and an edge
+                // that rolls over, bright where it faces the light.
+                ZStack {
+                    Gloss()
+                    shell
+                        .stroke(LinearGradient(colors: [.white, .white.opacity(0.3), .black.opacity(0.1)],
+                                               startPoint: .topLeading, endPoint: .bottomTrailing),
+                                lineWidth: 8)
+                        .blur(radius: 2)
+                }
                 .clipShape(shell)
+                // Fine parting line where the lid's top meets its polished lip.
                 shell
-                    .stroke(.black.opacity(0.07), lineWidth: 1)
+                    .stroke(Color.black.opacity(0.1), lineWidth: 0.6)
                     .padding(14)
+                shell
+                    .stroke(.white.opacity(0.7), lineWidth: 0.7)
+                    .padding(15)
                 shell
                     .stroke(LinearGradient(colors: [.white, .black.opacity(0.2)],
                                            startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.2)
                     .padding(0.6)
                 VStack(spacing: 0) {
-                    knuckle.overlay(alignment: .bottom) { lights.padding(.bottom, 16) }
+                    knuckle(outerEnd: .top)
+                        .overlay(alignment: .bottom) {
+                            IndicatorLights(axis: .vertical, isOn: isPoweredOn, scale: Self.hingeScale)
+                                .padding(.bottom, 7)
+                        }
                     slot.frame(height: cardWidth * 1.08)
-                    knuckle
+                    knuckle(outerEnd: .bottom)
                 }
                 .padding(.vertical, size.height * 0.07)
             }
         }
     }
 
-    private var knuckle: some View {
-        Capsule()
-            .fill(LinearGradient(stops: [
-                .init(color: Color(white: 0.72), location: 0),
-                .init(color: .white, location: 0.4),
-                .init(color: Color(white: 0.78), location: 1)
-            ], startPoint: .leading, endPoint: .trailing))
-            .overlay { Capsule().stroke(.black.opacity(0.12), lineWidth: 0.7) }
-            .frame(width: 20)
-            .padding(.vertical, 6)
+    /// The hinge's knuckles, at the size of the open console's (whose barrel is about 40 units thick).
+    private static let knuckleWidth: CGFloat = 22
+    private static let hingeScale: CGFloat = knuckleWidth / 40
+
+    private func knuckle(outerEnd: Edge) -> some View {
+        HingeBarrel(axis: .vertical, outerEnd: outerEnd, scale: Self.hingeScale)
+            .frame(width: Self.knuckleWidth)
+            .shadow(color: .black.opacity(0.18), radius: 1.5, x: 1.5)
     }
 
     private var slot: some View {
@@ -573,16 +584,6 @@ private struct ConsoleLid: View {
                 .overlay(alignment: .trailing) { Rectangle().fill(.white.opacity(0.5)).frame(width: 0.6).offset(x: 0.6) }
             Spacer(minLength: 0)
         }
-        .frame(width: 20)
-    }
-
-    private var lights: some View {
-        VStack(spacing: 5) {
-            Circle()
-                .fill(isPoweredOn ? Palette.ledOn : Palette.ledOff)
-                .shadow(color: isPoweredOn ? Palette.ledOn : .clear, radius: 3)
-            Circle().fill(Palette.ledOff)
-        }
-        .frame(width: 4)
+        .frame(width: Self.knuckleWidth)
     }
 }
