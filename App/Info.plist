@@ -20,8 +20,6 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
-	<key>NSCameraUsageDescription</key>
-	<string>The camera keeps the back of the console visible on the outer display.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Some games ask you to blow or speak into the microphone.</string>
 	<key>UIApplicationSceneManifest</key>
