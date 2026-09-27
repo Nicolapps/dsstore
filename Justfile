@@ -50,11 +50,17 @@ boot:
     xcrun simctl boot "$(just simulator='{{ simulator }}' _udid)" 2>/dev/null || true
     open -a '{{ xcode }}/Contents/Applications/DeviceHub.app'
 
-# Build, install and launch the app on the simulator, then show it in Bitrig.
+# Build, install and launch the app on Bitrig's own simulator (it keeps a separate device set), then show Bitrig.
 bitrig: build
-    xcrun simctl boot "$(just simulator='{{ simulator }}' _udid)" 2>/dev/null || true
-    xcrun simctl install "$(just simulator='{{ simulator }}' _udid)" {{ app }}
-    xcrun simctl launch --terminate-running-process "$(just simulator='{{ simulator }}' _udid)" {{ bundle_id }}
+    #!/usr/bin/env bash
+    set -euo pipefail
+    set=~/Library/Bitrig/Simulators
+    udid=$(xcrun simctl --set "$set" list devices available -j \
+        | jq -er --arg name '{{ simulator }}' \
+            '[.devices | to_entries | sort_by(.key) | reverse | .[].value[] | select(.name == $name)][0].udid // error("no Bitrig simulator named \($name)")')
+    xcrun simctl --set "$set" boot "$udid" 2>/dev/null || true
+    xcrun simctl --set "$set" install "$udid" {{ app }}
+    xcrun simctl --set "$set" launch --terminate-running-process "$udid" {{ bundle_id }}
     open -a Bitrig .
 
 # Uninstall the app from the simulator (also clears its save data).
