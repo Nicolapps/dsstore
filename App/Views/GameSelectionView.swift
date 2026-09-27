@@ -47,7 +47,7 @@ struct GameSelectionView: View {
                 VStack(spacing: 0) {
                     ForEach(0..<((DisplayGame.all.count + 1) / 2), id: \.self) { row in
                         GameShelf(games: Array(DisplayGame.all.dropFirst(row * 2).prefix(2)), scale: s,
-                                  liftedGame: selection, slotFrames: slotFrames) { game in
+                                  isUnderShelf: row > 0, liftedGame: selection, slotFrames: slotFrames) { game in
                             if game.isBundled {
                                 liftsIn = true
                                 selection = game.id
@@ -70,11 +70,16 @@ struct GameSelectionView: View {
             .frame(maxHeight: .infinity)
             .coordinateSpace(name: "shelves")
             .onPreferenceChange(ShelfOffsetKey.self) { shelfOffset = $0 }
-            // Draw only the viewport, wrapping the pattern phase with the content offset.
-            // This keeps the metal continuous through either end's rubber-band overscroll.
+            // Draw only the viewport, moving the pattern with the content offset.
+            // This keeps the board continuous through either end's rubber-band overscroll.
             .background {
                 Pegboard(verticalOffset: shelfOffset)
                     .overlay(alignment: .leading) { Color.black.opacity(0.07).frame(width: 5 * s) }
+                    // The lit sign spills onto the top of the board.
+                    .overlay(alignment: .top) {
+                        LinearGradient(colors: [.white.opacity(0.4), .white.opacity(0)], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 50 * s)
+                    }
             }
 
         }
@@ -90,7 +95,8 @@ struct GameSelectionView: View {
     }
 }
 
-/// Molded red ABS: a dark seam, a polished bevel, and a quieter satin face.
+/// Glossy red ABS lit from above: a dark seam, a soft reflection along the top of its rounded edge with a
+/// crisp highlight on it, and a shadowed lip where it meets the display.
 private struct CabinetFrame: View {
     let scale: CGFloat
     private var contour: ConcentricRectangle {
@@ -99,21 +105,32 @@ private struct CabinetFrame: View {
 
     var body: some View {
         ZStack {
-            contour.fill(Color(red: 0.34, green: 0.025, blue: 0.018))
+            contour.fill(Color(red: 0.3, green: 0.02, blue: 0.015))
             contour.fill(LinearGradient(stops: [
-                .init(color: Color(red: 1, green: 0.27, blue: 0.20), location: 0),
-                .init(color: Color(red: 0.87, green: 0.045, blue: 0.025), location: 0.25),
-                .init(color: Color(red: 0.72, green: 0.025, blue: 0.016), location: 0.8),
-                .init(color: Color(red: 0.48, green: 0.02, blue: 0.015), location: 1)
-            ], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .init(color: Color(red: 0.93, green: 0.1, blue: 0.07), location: 0),
+                .init(color: Color(red: 0.8, green: 0.04, blue: 0.025), location: 0.45),
+                .init(color: Color(red: 0.6, green: 0.02, blue: 0.015), location: 1)
+            ], startPoint: .top, endPoint: .bottom))
                 .padding(scale)
-            contour.stroke(LinearGradient(colors: [.white.opacity(0.65), .white.opacity(0.08), .black.opacity(0.3)],
-                                          startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: scale)
-                .padding(1.8 * scale)
-            contour.stroke(.black.opacity(0.16), lineWidth: 0.7 * scale)
-                .padding(7.5 * scale)
-            contour.stroke(.white.opacity(0.18), lineWidth: 0.7 * scale)
-                .padding(8.5 * scale)
+            contour.stroke(LinearGradient(stops: [
+                .init(color: .white.opacity(0.5), location: 0),
+                .init(color: .white.opacity(0.12), location: 0.1),
+                .init(color: .white.opacity(0), location: 0.3)
+            ], startPoint: .top, endPoint: .bottom), lineWidth: 4 * scale)
+                .blur(radius: 1.5 * scale)
+                .padding(3.5 * scale)
+            contour.stroke(LinearGradient(stops: [
+                .init(color: .white.opacity(0.9), location: 0),
+                .init(color: .white.opacity(0.2), location: 0.08),
+                .init(color: .white.opacity(0), location: 0.4),
+                .init(color: .black.opacity(0.25), location: 1)
+            ], startPoint: .top, endPoint: .bottom), lineWidth: 0.8 * scale)
+                .padding(1.6 * scale)
+            contour.stroke(.white.opacity(0.2), lineWidth: 0.6 * scale)
+                .padding(8 * scale)
+            contour.stroke(.black.opacity(0.35), lineWidth: 1.6 * scale)
+                .blur(radius: 0.8 * scale)
+                .padding(9.8 * scale)
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -124,11 +141,14 @@ private struct StoreHeader: View {
     let scale: CGFloat
     var body: some View {
         ZStack {
+            // A backlit diffuser: brightest in the middle, where the tube behind it is.
             LinearGradient(stops: [
-                .init(color: Color(white: 0.99), location: 0),
-                .init(color: Color(red: 0.95, green: 0.95, blue: 0.92), location: 0.5),
-                .init(color: Color(white: 0.82), location: 1)
+                .init(color: Color(white: 0.97), location: 0),
+                .init(color: Color(red: 0.97, green: 0.97, blue: 0.95), location: 0.6),
+                .init(color: Color(white: 0.88), location: 1)
             ], startPoint: .top, endPoint: .bottom)
+            EllipticalGradient(colors: [.white, .white.opacity(0)], center: .init(x: 0.5, y: 0.45),
+                               startRadiusFraction: 0, endRadiusFraction: 0.6)
             Grain().opacity(0.035)
             DSStoreLogo(scale: scale)
             VStack(spacing: 0) {
@@ -141,7 +161,7 @@ private struct StoreHeader: View {
             }
         }
         .frame(height: 132 * scale)
-        .shadow(color: .black.opacity(0.24), radius: 5 * scale, y: 5 * scale)
+        .shadow(color: .black.opacity(0.2), radius: 2.5 * scale, y: 2.5 * scale)
         .zIndex(1)
     }
 }
@@ -205,6 +225,8 @@ private enum StoreSpace {
     var frames: [String: CGRect] = [:]
 }
 
+/// A clear plastic keep case with the cover sheet under it: a rounded, lit edge, the hinge ridge down the
+/// spine, and the room's light reflected in the plastic.
 struct GameCase: View {
     let game: DisplayGame
     let scale: CGFloat
@@ -212,35 +234,35 @@ struct GameCase: View {
         Image(game.id)
             .resizable()
             .aspectRatio(contentMode: .fit)
+            .overlay { Rectangle().strokeBorder(.black.opacity(0.14), lineWidth: 0.5 * scale) }
             .padding(2 * scale)
-            .background(Color(white: 0.96))
-            .clipShape(RoundedRectangle(cornerRadius: 2 * scale))
-            .overlay {
-                RoundedRectangle(cornerRadius: 2 * scale)
-                    .strokeBorder(Color.white.opacity(0.65), lineWidth: scale)
-            }
+            .background(LinearGradient(colors: [Color(white: 0.95), Color(white: 0.86)], startPoint: .top, endPoint: .bottom))
+            .clipShape(RoundedRectangle(cornerRadius: 3 * scale))
             .overlay(alignment: .leading) {
-                LinearGradient(colors: [.black.opacity(0.22), .white.opacity(0.45), .clear], startPoint: .leading, endPoint: .trailing)
-                    .frame(width: 5 * scale)
+                LinearGradient(stops: [
+                    .init(color: .black.opacity(0.25), location: 0), .init(color: .white.opacity(0.5), location: 0.3),
+                    .init(color: .black.opacity(0.08), location: 0.75), .init(color: .clear, location: 1)
+                ], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: 6 * scale)
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 2 * scale)
-                    .fill(LinearGradient(stops: [
-                        .init(color: .white.opacity(0.16), location: 0),
-                        .init(color: .white.opacity(0.025), location: 0.4),
-                        .init(color: .clear, location: 0.41),
-                        .init(color: .black.opacity(0.035), location: 1)
-                    ], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .allowsHitTesting(false)
+                RoundedRectangle(cornerRadius: 3 * scale)
+                    .strokeBorder(LinearGradient(colors: [.white.opacity(0.85), .white.opacity(0.2), .black.opacity(0.28)],
+                                                 startPoint: .top, endPoint: .bottom), lineWidth: 0.8 * scale)
             }
-            .shadow(color: .black.opacity(0.3), radius: 0.8 * scale, x: scale, y: scale)
-            .shadow(color: .black.opacity(0.3), radius: 4 * scale, x: 4 * scale, y: 3 * scale)
+            .visualEffect { content, proxy in
+                content.colorEffect(ShaderLibrary.caseGlare(.float2(proxy.size), .float(proxy.frame(in: .global).minY)))
+            }
+            .shadow(color: .black.opacity(0.35), radius: 0.8 * scale, y: 0.8 * scale)
+            .shadow(color: .black.opacity(0.25), radius: 5 * scale, y: 4 * scale)
     }
 }
 
 private struct GameShelf: View {
     let games: [DisplayGame]
     let scale: CGFloat
+    /// Every row but the first has a shelf above it, shading the top of its board.
+    let isUnderShelf: Bool
     let liftedGame: String?
     let slotFrames: SlotFrames
     let onSelect: (DisplayGame) -> Void
@@ -253,6 +275,15 @@ private struct GameShelf: View {
                     }
                     .frame(width: 150 * scale)
                     .buttonStyle(.plain)
+                    // Where it stands, the case keeps the light off the shelf just in front of it.
+                    .background(alignment: .bottom) {
+                        Ellipse()
+                            .fill(.black.opacity(0.4))
+                            .frame(height: 6 * scale)
+                            .padding(.horizontal, -3 * scale)
+                            .blur(radius: 2.5 * scale)
+                            .offset(y: 2.5 * scale)
+                    }
                     // The lifted case is drawn above the store; leave its spot empty.
                     .opacity(liftedGame == game.id ? 0 : 1)
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(StoreSpace.name)) } action: {
@@ -267,18 +298,37 @@ private struct GameShelf: View {
             }
             .padding(.horizontal, 18 * scale)
             .padding(.top, 8 * scale)
-            .padding(.bottom, 0)
             .frame(height: 158 * scale, alignment: .bottom)
-            Rectangle()
-                .fill(LinearGradient(colors: [Color(white: 0.68), Color(white: 0.92), .white], startPoint: .top, endPoint: .bottom))
-                .frame(height: 9 * scale)
-            Rectangle()
-                .fill(LinearGradient(stops: [
-                    .init(color: .white, location: 0), .init(color: Color(white: 0.89), location: 0.15),
-                    .init(color: Color(white: 0.84), location: 0.8), .init(color: Color(white: 0.59), location: 1)
-                ], startPoint: .top, endPoint: .bottom))
-                .frame(height: 20 * scale)
-            .shadow(color: .black.opacity(0.3), radius: 4 * scale, y: 6 * scale)
+            // Light from above: the shelf overhead shades the board, which brightens further down
+            // and darkens again into the corner behind the shelf.
+            .background {
+                LinearGradient(stops: [
+                    .init(color: .black.opacity(isUnderShelf ? 0.22 : 0), location: 0),
+                    .init(color: .black.opacity(isUnderShelf ? 0.07 : 0), location: 0.14),
+                    .init(color: .clear, location: 0.4),
+                    .init(color: .clear, location: 0.8),
+                    .init(color: .black.opacity(0.1), location: 1)
+                ], startPoint: .top, endPoint: .bottom)
+            }
+            // The cases stand on the shelf, a little way back from its front edge.
+            .padding(.bottom, -4 * scale)
+            .zIndex(2)
+            VStack(spacing: 0) {
+                Rectangle()
+                    .fill(LinearGradient(colors: [Color(white: 0.6), Color(white: 0.84), Color(white: 0.95)],
+                                         startPoint: .top, endPoint: .bottom))
+                    .frame(height: 9 * scale)
+                Rectangle().fill(.white).frame(height: scale)
+                Rectangle()
+                    .fill(LinearGradient(stops: [
+                        .init(color: Color(white: 0.93), location: 0), .init(color: Color(white: 0.86), location: 0.2),
+                        .init(color: Color(white: 0.8), location: 0.8), .init(color: Color(white: 0.55), location: 1)
+                    ], startPoint: .top, endPoint: .bottom))
+                    .colorEffect(ShaderLibrary.brushedMetal(.float(scale)))
+                    .frame(height: 19 * scale)
+            }
+            .shadow(color: .black.opacity(0.35), radius: 1.5 * scale, y: 2 * scale)
+            .shadow(color: .black.opacity(0.25), radius: 6 * scale, y: 8 * scale)
             .zIndex(1)
         }
         .padding(.bottom, 8 * scale)
@@ -295,53 +345,30 @@ private struct ShelfOffsetKey: PreferenceKey {
 private struct Pegboard: View {
     var verticalOffset: CGFloat = 0
     var body: some View {
-        GeometryReader { geo in
-            let s = geo.size.width / 390
-            Canvas { context, size in
-                let pitch = 13 * s
-                let phase = verticalOffset.truncatingRemainder(dividingBy: pitch)
-                let rowCount = Int(ceil(size.height / pitch)) + 2
-                for column in 0..<18 {
-                    for row in -2..<rowCount {
-                        let rect = CGRect(x: CGFloat(column) * 23 * s + 9 * s, y: CGFloat(row) * pitch + 5 * s + phase, width: 2.4 * s, height: 6 * s)
-                        context.fill(Path(roundedRect: rect.offsetBy(dx: 0.6 * s, dy: s), cornerRadius: s), with: .color(.white.opacity(0.9)))
-                        context.fill(Path(roundedRect: rect, cornerRadius: 0.7 * s), with: .color(Color(white: 0.34)))
-                        context.fill(Path(roundedRect: CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: 1.5 * s), cornerRadius: 0.4 * s), with: .color(.black.opacity(0.55)))
-                    }
-                }
-                for column in [4, 9, 14] {
-                    let x = CGFloat(column) * 23 * s
-                    context.fill(Path(CGRect(x: x, y: 0, width: s, height: size.height)), with: .color(.black.opacity(0.09)))
-                    context.fill(Path(CGRect(x: x + s, y: 0, width: s, height: size.height)), with: .color(.white.opacity(0.65)))
-                }
+        Rectangle()
+            .visualEffect { content, proxy in
+                content.colorEffect(ShaderLibrary.pegboard(.float2(proxy.size), .float(verticalOffset)))
             }
-        }
-        .background(LinearGradient(colors: [Color(white: 0.78), Color(white: 0.91), Color(white: 0.76)], startPoint: .leading, endPoint: .trailing))
-        .overlay { Grain(verticalOffset: verticalOffset).opacity(0.055) }
-        .overlay {
-            LinearGradient(stops: [
-                .init(color: .black.opacity(0.16), location: 0),
-                .init(color: .clear, location: 0.09),
-                .init(color: .clear, location: 0.88),
-                .init(color: .black.opacity(0.18), location: 1)
-            ], startPoint: .leading, endPoint: .trailing)
-        }
-        .allowsHitTesting(false)
-        .clipped()
-        .accessibilityHidden(true)
+            .overlay {
+                LinearGradient(stops: [
+                    .init(color: .black.opacity(0.16), location: 0),
+                    .init(color: .clear, location: 0.09),
+                    .init(color: .clear, location: 0.88),
+                    .init(color: .black.opacity(0.18), location: 1)
+                ], startPoint: .leading, endPoint: .trailing)
+            }
+            .allowsHitTesting(false)
+            .clipped()
+            .accessibilityHidden(true)
     }
 }
 
 private struct Grain: View {
-    var verticalOffset: CGFloat = 0
     var body: some View {
         Canvas { context, size in
             for index in 0..<9000 {
                 let x = CGFloat((index * 67 + 13) % 997) / 997 * size.width
-                let baseY = CGFloat((index * 137 + 29) % 991) / 991 * size.height
-                let height = max(size.height, 1)
-                let shiftedY = (baseY + verticalOffset).truncatingRemainder(dividingBy: height)
-                let y = shiftedY < 0 ? shiftedY + height : shiftedY
+                let y = CGFloat((index * 137 + 29) % 991) / 991 * size.height
                 context.fill(Path(CGRect(x: x, y: y, width: 0.6, height: 0.6)), with: .color(index.isMultiple(of: 2) ? .white : .black))
             }
         }
