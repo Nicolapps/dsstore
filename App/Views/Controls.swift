@@ -417,7 +417,7 @@ struct SystemButtons: View {
                 Text(title)
                     .font(HardwareFont.label(size: 10.5 * scale))
                     .kerning(0.6 * scale)
-                    .engraved()
+                    .engraved(Color(white: 0.5))
             }
             .padding(5 * scale)
         }
