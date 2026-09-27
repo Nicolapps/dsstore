@@ -231,7 +231,7 @@ struct FaceButtons: View {
             RaisedCap(shape: Circle(), isPressed: isPressed, travel: diameter * 0.09, bevel: diameter * 0.08) {
                 Text(title)
                     .font(HardwareFont.faceLetter(size: diameter * 0.38))
-                    .engraved(Color(white: 0.78))
+                    .engraved(Color(white: 0.7))
             }
             .frame(width: diameter, height: diameter)
         }
