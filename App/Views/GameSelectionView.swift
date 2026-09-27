@@ -164,7 +164,7 @@ private struct StoreHeader: View {
                     .frame(height: 5 * scale)
             }
         }
-        .frame(height: 88 * scale)
+        .frame(height: 100 * scale)
         .shadow(color: .black.opacity(0.2), radius: 2.5 * scale, y: 2.5 * scale)
         .zIndex(1)
     }
@@ -177,7 +177,7 @@ private struct DSStoreLogo: View {
         Image("DSStoreLogo")
             .resizable()
             .scaledToFit()
-            .frame(height: 44 * scale)
+            .frame(height: 36 * scale)
             .shadow(color: .white.opacity(0.95), radius: 0, y: scale)
             .accessibilityLabel("DS Store")
     }
