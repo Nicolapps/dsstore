@@ -16,6 +16,40 @@ private struct HoldGesture: ViewModifier {
     }
 }
 
+/// Shows `value` as it changes, except that a release (a return to `rest`) that follows a press too
+/// closely is held back for a moment, so even the quickest tap plays the whole push-down animation.
+private struct Latched<Value: Equatable, Content: View>: View {
+    let value: Value
+    let rest: Value
+    @ViewBuilder let content: (Value) -> Content
+
+    private static var minimumPress: Duration { .milliseconds(100) }
+
+    @State private var shown: Value?
+    @State private var pressedAt = ContinuousClock.now
+    @State private var release: Task<Void, Never>?
+
+    var body: some View {
+        content(shown ?? value)
+            .onChange(of: value) { _, newValue in
+                release?.cancel()
+                release = nil
+                let remaining = Self.minimumPress - (ContinuousClock.now - pressedAt)
+                guard newValue == rest, remaining > .zero else {
+                    if newValue != rest, shown ?? rest == rest { pressedAt = .now }
+                    shown = newValue
+                    return
+                }
+                release = Task {
+                    try? await Task.sleep(for: remaining)
+                    guard !Task.isCancelled else { return }
+                    shown = newValue
+                }
+            }
+            .onDisappear { release?.cancel() }
+    }
+}
+
 /// A button that forwards press and release to the emulator.
 private struct HardwareButton<Label: View>: View {
     let button: DSButton
@@ -25,15 +59,17 @@ private struct HardwareButton<Label: View>: View {
     @State private var isPressed = false
 
     var body: some View {
-        label(isPressed || emulator.keyboardButtons.contains(button))
-            .modifier(HoldGesture(isPressed: $isPressed))
-            .onChange(of: isPressed) { _, pressed in
-                if pressed { emulator.press(button) } else { emulator.release(button) }
-            }
-            .onDisappear {
-                if isPressed { emulator.release(button) }
-                isPressed = false
-            }
+        Latched(value: isPressed || emulator.keyboardButtons.contains(button), rest: false) { shown in
+            label(shown)
+        }
+        .modifier(HoldGesture(isPressed: $isPressed))
+        .onChange(of: isPressed) { _, pressed in
+            if pressed { emulator.press(button) } else { emulator.release(button) }
+        }
+        .onDisappear {
+            if isPressed { emulator.release(button) }
+            isPressed = false
+        }
     }
 }
 
@@ -250,12 +286,29 @@ struct DPad: View {
     private static let directions: Set<DSButton> = [.up, .down, .left, .right]
 
     var body: some View {
-        let tilt = Self.tilt(for: pressed.union(emulator.keyboardButtons.intersection(Self.directions)))
+        Latched(value: pressed.union(emulator.keyboardButtons.intersection(Self.directions)), rest: []) { shown in
+            pad(tilt: Self.tilt(for: shown))
+        }
+        .frame(width: size, height: size)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in update(directions(at: value.location)) }
+                .onEnded { _ in update([]) }
+        )
+        .onDisappear { update([]) }
+        .accessibilityLabel("Directional pad")
+        .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: pressed) { old, new in
+            !new.subtracting(old).isEmpty
+        }
+    }
+
+    private func pad(tilt: CGVector) -> some View {
         let travel = size * 0.05
         // A real pad rocks on a pivot under its center: the pressed arm dips, the opposite one rises.
         let shape = DPadShape()
 
-        ZStack {
+        return ZStack {
             Well(shape: shape, gap: size * 0.016)
             CastShadow(shape: shape, lift: travel, travel: travel, tilt: tilt)
             ZStack {
@@ -276,18 +329,6 @@ struct DPad: View {
             }
         }
         .animation(.spring(duration: 0.2, bounce: 0.35), value: tilt)
-        .frame(width: size, height: size)
-        .contentShape(Rectangle())
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { value in update(directions(at: value.location)) }
-                .onEnded { _ in update([]) }
-        )
-        .onDisappear { update([]) }
-        .accessibilityLabel("Directional pad")
-        .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: pressed) { old, new in
-            !new.subtracting(old).isEmpty
-        }
     }
 
     /// Which way the pad leans, as a unit vector in view coordinates (zero when centered).
