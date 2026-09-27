@@ -24,8 +24,36 @@ struct ConsoleView: View {
             .statusBarHidden()
             .persistentSystemOverlays(.hidden)
             .preferredColorScheme(.light)
+            #if targetEnvironment(simulator)
+            .modifier(OuterDisplayBack())
+            #endif
     }
 }
+
+#if targetEnvironment(simulator)
+/// Shows the back of the DS on the outer display through a camera capture accessory.
+/// That requires a running camera with a visible preview, so it's limited to the simulator.
+private struct OuterDisplayBack: ViewModifier {
+    @State private var camera = AccessoryCamera()
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .topLeading) {
+                CameraPreview(session: camera.session)
+                    .frame(width: 48, height: 64)
+                    .clipShape(.rect(cornerRadius: 8))
+                    .padding(12)
+                    .allowsHitTesting(false)
+            }
+            .sceneAccessory {
+                CameraCaptureAccessory { ConsoleBack() }
+                    .onAvailabilityChange { print("Camera capture accessory available: \($0)") }
+            }
+            .onAppear { camera.start() }
+            .onDisappear { camera.stop() }
+    }
+}
+#endif
 
 /// In hardware coordinates the two equal panels meet at the physical fold.
 private struct ConsoleBody: View {
