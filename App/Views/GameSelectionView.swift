@@ -312,11 +312,11 @@ private struct CaseGlare: View {
     var body: some View {
         LinearGradient(stops: [
             .init(color: .white.opacity(0), location: 0.38),
-            .init(color: .white.opacity(0.3), location: 0.45),
-            .init(color: .white.opacity(0.22), location: 0.5),
+            .init(color: .white.opacity(0.16), location: 0.45),
+            .init(color: .white.opacity(0.12), location: 0.5),
             .init(color: .white.opacity(0), location: 0.56),
             .init(color: .white.opacity(0), location: 0.585),
-            .init(color: .white.opacity(0.4), location: 0.59),
+            .init(color: .white.opacity(0.22), location: 0.59),
             .init(color: .white.opacity(0), location: 0.597)
         ], startPoint: .init(x: 0.3, y: 0), endPoint: .init(x: 0.7, y: 1))
             .scaleEffect(y: 4)
