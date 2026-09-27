@@ -4,7 +4,7 @@
 
 **[▶ Watch the demo video on YouTube](https://youtu.be/n9qt1C6v90o)**
 
-A SwiftUI Nintendo DS app for iOS, built on [DeltaCore](https://github.com/rileytestut/DeltaCore) and [melonDS](https://melonds.kuribo64.net) (via [MelonDSDeltaCore](https://github.com/rileytestut/MelonDSDeltaCore)). It boots a single game bundled into the app.
+A SwiftUI Nintendo DS app for iOS, built on [DeltaCore](https://github.com/rileytestut/DeltaCore) and [melonDS](https://melonds.kuribo64.net) (via [MelonDSDeltaCore](https://github.com/rileytestut/MelonDSDeltaCore)). It shows a store of games and plays the ones bundled into the app.
 
 ## Requirements
 
@@ -17,7 +17,7 @@ A SwiftUI Nintendo DS app for iOS, built on [DeltaCore](https://github.com/riley
 git clone --recursive <repo-url>
 cd dsstore
 just bootstrap            # fetch submodules, patch them, generate the Xcode project
-just rom /path/to/game.nds
+just rom kart /path/to/game.nds   # bundle a game under its store id
 just run                  # build and launch on the simulator
 ```
 
@@ -25,7 +25,7 @@ Run `just` to list every recipe. To pick another simulator, pass `just simulator
 
 ## Games
 
-No games are included. Use a dump of a game you own; see [`ROM/README.md`](ROM/README.md).
+No games are included. Put them in `ROM/` under their store ids (listed in `App/Views/GameSelectionView.swift`); see [`ROM/README.md`](ROM/README.md).
 
 ## License
 
