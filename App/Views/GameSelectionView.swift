@@ -13,10 +13,7 @@ struct GameSelectionView: View {
         GeometryReader { geometry in
             let scale = geometry.size.width / 414
             cabinet(scale: scale)
-                // Keep the frame below the Duo camera, including configurations that report no top inset.
-                .padding(.horizontal, 8 * scale)
-                .padding(.bottom, 8 * scale)
-                .padding(.top, max(16, 80 - geometry.safeAreaInsets.top))
+                .padding(8 * scale)
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 // The overlay shares this space's origin, so slot frames measured in it need no converting.
                 .coordinateSpace(.named(StoreSpace.name))
@@ -167,7 +164,7 @@ private struct StoreHeader: View {
                     .frame(height: 5 * scale)
             }
         }
-        .frame(height: 132 * scale)
+        .frame(height: 88 * scale)
         .shadow(color: .black.opacity(0.2), radius: 2.5 * scale, y: 2.5 * scale)
         .zIndex(1)
     }
