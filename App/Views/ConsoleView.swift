@@ -20,6 +20,7 @@ struct ConsoleView: View {
         // Hold the device upside down relative to its fixed portrait orientation, so
         // the top screen sits on the physical half that is at the bottom in portrait.
         ConsoleBody(emulator: emulator)
+            .keyboardControls(for: emulator)
             .attachedToPhysicalDisplay(upsideDown: true)
             .statusBarHidden()
             .persistentSystemOverlays(.hidden)
