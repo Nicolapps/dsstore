@@ -147,10 +147,10 @@ private struct Rock: GeometryEffect {
         let amount = hypot(tilt.dx, tilt.dy)
         guard amount > 0, lift > 0, size.width > 0, size.height > 0 else { return ProjectionTransform() }
         // How far each tip moves from its resting height, relative to the cap's full lift.
-        let dip: CGFloat = 0.8
+        let dip: CGFloat = 0.45
         var transform = CATransform3DMakeTranslation(-size.width / 2, -size.height / 2, 0)
         // Foreshortening: the sunken side is farther from the viewer.
-        let angle = atan(dip * lift / (size.width / 2)) * 1.6
+        let angle = atan(dip * lift / (size.width / 2))
         transform = CATransform3DConcat(transform, CATransform3DMakeRotation(angle * amount, -tilt.dy, tilt.dx, 0))
         var perspective = CATransform3DIdentity
         perspective.m34 = -1 / (size.width * 2.2)
@@ -231,7 +231,7 @@ struct FaceButtons: View {
             RaisedCap(shape: Circle(), isPressed: isPressed, travel: diameter * 0.09, bevel: diameter * 0.08) {
                 Text(title)
                     .font(HardwareFont.label(size: diameter * 0.42))
-                    .engraved(Color(white: 0.6))
+                    .engraved()
             }
             .frame(width: diameter, height: diameter)
         }
@@ -401,7 +401,7 @@ struct SystemButtons: View {
     let scale: CGFloat
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4 * scale) {
+        VStack(alignment: .leading, spacing: 12 * scale) {
             row(.start, "START")
             row(.select, "SELECT")
         }
@@ -410,12 +410,12 @@ struct SystemButtons: View {
     private func row(_ button: DSButton, _ title: String) -> some View {
         HardwareButton(button: button, emulator: emulator) { isPressed in
             HStack(spacing: 7 * scale) {
-                RaisedCap(shape: Circle(), isPressed: isPressed, travel: 2 * scale, bevel: 1.4 * scale) {
+                RaisedCap(shape: Circle(), isPressed: isPressed, travel: 2.4 * scale, bevel: 1.6 * scale) {
                     EmptyView()
                 }
-                .frame(width: 15 * scale, height: 15 * scale)
+                .frame(width: 18 * scale, height: 18 * scale)
                 Text(title)
-                    .font(HardwareFont.label(size: 8 * scale))
+                    .font(HardwareFont.label(size: 10.5 * scale))
                     .kerning(0.6 * scale)
                     .engraved()
             }
@@ -443,7 +443,7 @@ struct ShoulderButton: View {
             ), isPressed: isPressed, travel: 3.2 * scale, bevel: 2.4 * scale, gloss: false) {
                 Text(isLeft ? "L" : "R")
                     .font(HardwareFont.label(size: 11 * scale))
-                    .engraved(Color(white: 0.6))
+                    .engraved()
             }
             .frame(width: 36 * scale, height: 26 * scale)
         }

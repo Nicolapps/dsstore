@@ -4,7 +4,7 @@ enum Palette {
     static let background = Color(white: 0.17)
     static let shellLight = Color(red: 0.99, green: 0.99, blue: 0.98)
     static let shellDark = Color(red: 0.82, green: 0.83, blue: 0.83)
-    static let engraving = Color(red: 0.57, green: 0.58, blue: 0.56)
+    static let engraving = Color(white: 0.64)
     static let ledOn = Color(red: 0.48, green: 0.88, blue: 0.25)
     static let ledOff = Color(red: 0.66, green: 0.68, blue: 0.64)
     static let screenOff = Color(red: 0.13, green: 0.14, blue: 0.13)
@@ -12,7 +12,7 @@ enum Palette {
 
 /// The lettering molded into the shell and printed on the buttons.
 enum HardwareFont {
-    static func label(size: CGFloat) -> Font { .custom("DINAlternate-Bold", fixedSize: size) }
+    static func label(size: CGFloat) -> Font { .custom("AvenirNext-Medium", fixedSize: size) }
 }
 
 struct ConsoleView: View {
@@ -278,14 +278,14 @@ private struct Microphone: View {
                 Capsule().strokeBorder(LinearGradient(colors: [.clear, .white.opacity(0.9)], startPoint: .top, endPoint: .bottom),
                                        lineWidth: 0.6 * scale)
             }
-            .frame(width: 2.8 * scale, height: 10 * scale)
+            .frame(width: 3.6 * scale, height: 15 * scale)
             .overlay(alignment: .leading) {
                 Text("MIC.")
-                    .font(HardwareFont.label(size: 6.5 * scale))
+                    .font(HardwareFont.label(size: 9.5 * scale))
                     .kerning(0.4 * scale)
                     .engraved()
                     .fixedSize()
-                    .offset(x: 6 * scale)
+                    .offset(x: 9 * scale)
             }
             .accessibilityHidden(true)
     }
@@ -345,14 +345,9 @@ private struct BottomHalf: View {
                             .overlay { TouchSurface(emulator: emulator) }
                     }
                 }
-                VStack(spacing: 0) {
-                    FaceButtons(emulator: emulator, size: faceSize)
-                        .padding(.top, controlsCenter - faceSize / 2)
-                    Spacer(minLength: 0)
-                    SystemButtons(emulator: emulator, scale: scale)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: screenHeight)
+                FaceButtons(emulator: emulator, size: faceSize)
+                    .padding(.top, controlsCenter - faceSize / 2)
+                    .frame(maxWidth: .infinity)
             }
             .padding(.horizontal, 8 * scale)
             .padding(.top, 50 * scale)
@@ -364,6 +359,18 @@ private struct BottomHalf: View {
             }
             .padding(.horizontal, 18 * scale)
             .padding(.top, 30 * scale)
+
+            // START and SELECT sit down in the corner, below the face buttons' column.
+            HStack(spacing: 0) {
+                Color.clear.frame(maxWidth: .infinity)
+                Color.clear.frame(width: screenWidth + 20 * scale)
+                SystemButtons(emulator: emulator, scale: scale)
+                    .frame(maxWidth: .infinity)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 8 * scale)
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            .padding(.bottom, 26 * scale)
         }
     }
 }
