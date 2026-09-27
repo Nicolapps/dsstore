@@ -164,19 +164,22 @@ private struct SpeakerColumn: View {
     }
 }
 
-/// A soft gray pad the lid closes onto, standing just proud of the shell.
+/// A small clear bumper the lid closes onto: nearly flush with the shell, it shows mostly as a fine square outline.
 private struct RubberFoot: View {
     let scale: CGFloat
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 2.5 * scale, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 1.5 * scale, style: .continuous)
         shape
-            .fill(LinearGradient(colors: [Color(white: 0.91), Color(white: 0.84)], startPoint: .top, endPoint: .bottom))
+            .fill(LinearGradient(colors: [Color(white: 0.965), Color(white: 0.99)], startPoint: .top, endPoint: .bottom))
+            .overlay { shape.strokeBorder(Color(white: 0.72), lineWidth: 0.7 * scale) }
+            // Its lower edge catches the light, its upper one sits in a hairline of shadow.
             .overlay {
-                shape.strokeBorder(LinearGradient(colors: [.white, .black.opacity(0.12)], startPoint: .top, endPoint: .bottom),
-                                   lineWidth: 0.8 * scale)
+                shape.strokeBorder(LinearGradient(colors: [.black.opacity(0.08), .white.opacity(0.9)],
+                                                  startPoint: .top, endPoint: .bottom),
+                                   lineWidth: 1.4 * scale)
+                    .padding(0.7 * scale)
             }
-            .frame(width: 13 * scale, height: 11 * scale)
-            .shadow(color: .black.opacity(0.18), radius: 0.8 * scale, y: 0.8 * scale)
+            .frame(width: 12 * scale, height: 12 * scale)
     }
 }
 
