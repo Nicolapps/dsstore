@@ -19,4 +19,10 @@ grep -q '_audioConverter = nil;' Vendor/MelonDSDeltaCore/MelonDSDeltaCore/Bridge
     perl -0pi -e 's/(- \(void\)prepareAudioEngine\n\{\n    self\.audioEngine = \[\[AVAudioEngine alloc\] init\];\n)/$1\n    \/\/ Recreate the converter from the new engine\x27s input format, which may have changed since the last start.\n    _audioConverter = nil;\n\n/' \
         Vendor/MelonDSDeltaCore/MelonDSDeltaCore/Bridge/MelonDSEmulatorBridge.mm
 
+# melonDS' ARM64 JIT linkage is assembly that only builds for arm64, so tools that build every
+# simulator architecture (like Bitrig) need x86_64 excluded from the core itself, not just the app.
+grep -q 'EXCLUDED_ARCHS' Vendor/MelonDSDeltaCore/MelonDSDeltaCore.xcodeproj/project.pbxproj ||
+    perl -pi -e 's/^(\t+)buildSettings = \{\n/$1buildSettings = {\n$1\t"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;\n/' \
+        Vendor/MelonDSDeltaCore/MelonDSDeltaCore.xcodeproj/project.pbxproj
+
 xcodegen generate
