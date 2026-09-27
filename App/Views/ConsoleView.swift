@@ -13,6 +13,8 @@ enum Palette {
 /// The lettering molded into the shell and printed on the buttons.
 enum HardwareFont {
     static func label(size: CGFloat) -> Font { .custom("AvenirNext-Medium", fixedSize: size) }
+    /// The thinner, fainter letters printed on the face buttons.
+    static func faceLetter(size: CGFloat) -> Font { .custom("AvenirNext-Regular", fixedSize: size) }
 }
 
 struct ConsoleView: View {

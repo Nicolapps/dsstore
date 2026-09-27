@@ -230,8 +230,8 @@ struct FaceButtons: View {
         return HardwareButton(button: button, emulator: emulator) { isPressed in
             RaisedCap(shape: Circle(), isPressed: isPressed, travel: diameter * 0.09, bevel: diameter * 0.08) {
                 Text(title)
-                    .font(HardwareFont.label(size: diameter * 0.42))
-                    .engraved()
+                    .font(HardwareFont.faceLetter(size: diameter * 0.38))
+                    .engraved(Color(white: 0.78))
             }
             .frame(width: diameter, height: diameter)
         }
@@ -328,17 +328,17 @@ private struct DPadMarkings: View {
         ZStack {
             ForEach(0..<4, id: \.self) { direction in
                 Capsule()
-                    .fill(Color(white: 0.7).shadow(.inner(color: .black.opacity(0.35), radius: 0.6, y: 0.6)))
-                    .frame(width: size * 0.022, height: size * 0.12)
+                    .fill(Color(white: 0.84).shadow(.inner(color: .black.opacity(0.15), radius: 0.5, y: 0.5)))
+                    .frame(width: size * 0.018, height: size * 0.1)
                     .shadow(color: .white, radius: 0, y: 0.8)
                     .offset(y: -size * 0.33)
                     .rotationEffect(.degrees(Double(direction) * 90))
             }
             Circle()
-                .fill(LinearGradient(colors: [Color(white: 0.84), Color(white: 0.93), .white],
+                .fill(LinearGradient(colors: [Color(white: 0.9), Color(white: 0.96), .white],
                                      startPoint: .top, endPoint: .bottom))
                 .overlay {
-                    Circle().strokeBorder(LinearGradient(colors: [.black.opacity(0.12), .white],
+                    Circle().strokeBorder(LinearGradient(colors: [.black.opacity(0.06), .white],
                                                          startPoint: .top, endPoint: .bottom),
                                           lineWidth: size * 0.01)
                 }
