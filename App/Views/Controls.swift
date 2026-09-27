@@ -37,32 +37,173 @@ private struct HardwareButton<Label: View>: View {
     }
 }
 
-/// A stationary dark socket surrounds a raised cap, with a narrow molded bevel.
-private struct MoldedCap<S: InsettableShape>: View {
+extension View {
+    /// Text molded into the shell: a shade darker than the plastic, with the lip below it catching the light.
+    func engraved(_ color: Color = Palette.engraving) -> some View {
+        foregroundStyle(color)
+            .shadow(color: .white.opacity(0.9), radius: 0, x: 0, y: 0.8)
+    }
+}
+
+// MARK: - Molded caps
+
+/// The console is seen from slightly in front, lit from above: a raised cap shows a sliver of
+/// its side wall below its top face, and sinks into a dark well in the shell when pushed.
+private struct RaisedCap<S: InsettableShape, Top: View>: View {
     let shape: S
     let isPressed: Bool
-    let depth: CGFloat
+    /// How far a released cap stands out of its well.
+    let travel: CGFloat
+    /// Width of the rounded edge between the top face and the side wall.
+    let bevel: CGFloat
+    var gloss = true
+    @ViewBuilder var top: Top
 
     var body: some View {
+        let lift = isPressed ? travel * 0.18 : travel
+
         ZStack {
-            shape.fill(Color(white: 0.43).shadow(.inner(color: .black.opacity(0.45), radius: depth, y: depth)))
-                .overlay { shape.strokeBorder(.white.opacity(0.85), lineWidth: depth * 0.35) }
-            shape
-                .fill(LinearGradient(colors: [Color(white: 0.99), Color(white: 0.76), Color(white: 0.60)],
-                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-                .padding(depth * 0.65)
-                .shadow(color: .black.opacity(isPressed ? 0.15 : 0.38), radius: depth * 0.5,
-                        x: depth * 0.3, y: isPressed ? 0 : depth)
-            shape
-                .fill(LinearGradient(stops: [
-                    .init(color: Color(white: isPressed ? 0.86 : 0.985), location: 0),
-                    .init(color: Color(white: isPressed ? 0.88 : 0.95), location: 0.48),
-                    .init(color: Color(white: 0.87), location: 1)
-                ], startPoint: .topLeading, endPoint: .bottomTrailing))
-                .overlay { shape.strokeBorder(.white.opacity(0.7), lineWidth: depth * 0.3) }
-                .padding(depth * 1.4)
-                .offset(y: isPressed ? depth * 0.45 : -depth * 0.35)
+            Well(shape: shape, gap: travel * 0.5)
+            CastShadow(shape: shape, lift: lift, travel: travel)
+            CapSide(shape: shape, lift: lift)
+            CapFace(shape: shape, bevel: bevel, gloss: gloss, dimmed: isPressed) { top }
+                .offset(y: -lift)
         }
+        .animation(isPressed ? .easeOut(duration: 0.05) : .spring(duration: 0.26, bounce: 0.45), value: isPressed)
+    }
+}
+
+/// The opening in the shell a cap sits in: its upper wall in shadow, its lower lip catching the light.
+private struct Well<S: InsettableShape>: View {
+    let shape: S
+    let gap: CGFloat
+
+    var body: some View {
+        let hole = shape.inset(by: -gap)
+        hole.fill(Color(white: 0.36).shadow(.inner(color: .black.opacity(0.75), radius: gap * 1.4, y: gap)))
+            .overlay {
+                hole.strokeBorder(LinearGradient(colors: [.black.opacity(0.3), .black.opacity(0.05), .white],
+                                                 startPoint: .top, endPoint: .bottom),
+                                  lineWidth: max(0.6, gap * 0.45))
+            }
+    }
+}
+
+/// Soft and long while the cap stands proud, tight once it's pushed down against the well.
+private struct CastShadow<S: Shape>: View {
+    let shape: S
+    let lift: CGFloat
+    let travel: CGFloat
+    var tilt: CGVector = .zero
+
+    var body: some View {
+        let height = lift / travel
+        shape.fill(.black.opacity(0.22 + 0.2 * height))
+            .blur(radius: travel * (0.25 + 0.6 * height))
+            .offset(x: -tilt.dx * travel * 0.3, y: travel * (0.12 + 0.45 * height) - tilt.dy * travel * 0.3)
+    }
+}
+
+/// The cap's side wall, swept from its base up to the top face so the whole silhouette stays solid.
+private struct CapSide<S: Shape>: View {
+    let shape: S
+    let lift: CGFloat
+    var tilt: CGVector = .zero
+
+    var body: some View {
+        let steps = 8
+        ZStack {
+            ForEach(0...steps, id: \.self) { step in
+                let height = CGFloat(step) / CGFloat(steps)
+                shape
+                    .fill(LinearGradient(stops: [
+                        .init(color: Color(white: 0.52), location: 0),
+                        .init(color: Color(white: 0.72), location: 0.22),
+                        .init(color: Color(white: 0.80), location: 0.5),
+                        .init(color: Color(white: 0.69), location: 0.8),
+                        .init(color: Color(white: 0.50), location: 1)
+                    ], startPoint: .leading, endPoint: .trailing))
+                    .modifier(Rock(tilt: tilt, lift: lift * height))
+                    .offset(y: -lift * height)
+            }
+            // Where the wall meets the well.
+            shape.stroke(.black.opacity(0.22), lineWidth: 0.6)
+        }
+    }
+}
+
+/// Leans a slice of a rocking cap that stands `lift` above its well: the side in the tilt's direction
+/// sinks toward the shell (so, seen from the front, it drops and recedes) while the opposite side rises.
+private struct Rock: GeometryEffect {
+    var tilt: CGVector
+    let lift: CGFloat
+
+    var animatableData: AnimatablePair<CGFloat, CGFloat> {
+        get { AnimatablePair(tilt.dx, tilt.dy) }
+        set { tilt = CGVector(dx: newValue.first, dy: newValue.second) }
+    }
+
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        let amount = hypot(tilt.dx, tilt.dy)
+        guard amount > 0, lift > 0, size.width > 0, size.height > 0 else { return ProjectionTransform() }
+        // How far each tip moves from its resting height, relative to the cap's full lift.
+        let dip: CGFloat = 0.8
+        var transform = CATransform3DMakeTranslation(-size.width / 2, -size.height / 2, 0)
+        // Foreshortening: the sunken side is farther from the viewer.
+        let angle = atan(dip * lift / (size.width / 2)) * 1.6
+        transform = CATransform3DConcat(transform, CATransform3DMakeRotation(angle * amount, -tilt.dy, tilt.dx, 0))
+        var perspective = CATransform3DIdentity
+        perspective.m34 = -1 / (size.width * 2.2)
+        transform = CATransform3DConcat(transform, perspective)
+        // Parallax: lower points sit less far above the shell, so they show lower on screen.
+        var shear = CATransform3DIdentity
+        shear.m12 = dip * lift * tilt.dx / (size.width / 2)
+        shear.m22 = 1 + dip * lift * tilt.dy / (size.height / 2)
+        transform = CATransform3DConcat(transform, shear)
+        transform = CATransform3DConcat(transform, CATransform3DMakeTranslation(size.width / 2, size.height / 2, 0))
+        return ProjectionTransform(transform)
+    }
+}
+
+/// The top of a white glossy cap: gently domed, with a rounded edge and a soft reflection of the light above.
+private struct CapFace<S: InsettableShape, Top: View>: View {
+    let shape: S
+    let bevel: CGFloat
+    let gloss: Bool
+    let dimmed: Bool
+    @ViewBuilder var top: Top
+
+    var body: some View {
+        shape
+            .fill(EllipticalGradient(stops: [
+                .init(color: .white, location: 0),
+                .init(color: Color(white: 0.965), location: 0.5),
+                .init(color: Color(white: 0.88), location: 1)
+            ], center: UnitPoint(x: 0.42, y: 0.3), startRadiusFraction: 0, endRadiusFraction: 0.85))
+            .overlay {
+                // The rounded edge: bright where it turns toward the light, shaded where it turns away.
+                shape.strokeBorder(LinearGradient(stops: [
+                    .init(color: .white, location: 0),
+                    .init(color: .white.opacity(0.2), location: 0.35),
+                    .init(color: .black.opacity(0.04), location: 0.6),
+                    .init(color: .black.opacity(0.2), location: 1)
+                ], startPoint: .top, endPoint: .bottom), lineWidth: bevel)
+                .blur(radius: bevel * 0.35)
+            }
+            .overlay {
+                if gloss {
+                    GeometryReader { proxy in
+                        Ellipse()
+                            .fill(.white.opacity(0.85))
+                            .frame(width: proxy.size.width * 0.46, height: proxy.size.height * 0.2)
+                            .blur(radius: proxy.size.width * 0.05)
+                            .position(x: proxy.size.width * 0.44, y: proxy.size.height * 0.2)
+                    }
+                }
+            }
+            .overlay { top }
+            .overlay { shape.fill(.black.opacity(dimmed ? 0.06 : 0)) }
+            .clipShape(shape)
     }
 }
 
@@ -73,7 +214,7 @@ struct FaceButtons: View {
     let size: CGFloat
 
     var body: some View {
-        let offset = size * 0.33
+        let offset = size * 0.335
 
         ZStack {
             face(.x, "X").offset(y: -offset)
@@ -85,17 +226,14 @@ struct FaceButtons: View {
     }
 
     private func face(_ button: DSButton, _ title: String) -> some View {
-        let diameter = size * 0.34
+        let diameter = size * 0.31
         return HardwareButton(button: button, emulator: emulator) { isPressed in
-            MoldedCap(shape: Circle(), isPressed: isPressed, depth: diameter * 0.055)
-                .overlay {
-                    Text(title)
-                        .font(.system(size: diameter * 0.40, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color(white: 0.49))
-                        .shadow(color: .white.opacity(0.95), radius: 0, x: 0.5, y: 0.8)
-                        .offset(y: isPressed ? diameter * 0.025 : -diameter * 0.018)
-                }
-                .frame(width: diameter, height: diameter)
+            RaisedCap(shape: Circle(), isPressed: isPressed, travel: diameter * 0.09, bevel: diameter * 0.08) {
+                Text(title)
+                    .font(HardwareFont.label(size: diameter * 0.42))
+                    .engraved(Color(white: 0.6))
+            }
+            .frame(width: diameter, height: diameter)
         }
         .accessibilityLabel(title)
     }
@@ -109,23 +247,35 @@ struct DPad: View {
 
     @State private var pressed: Set<DSButton> = []
 
+    private static let directions: Set<DSButton> = [.up, .down, .left, .right]
+
     var body: some View {
-        let arm = size * 0.34
+        let tilt = Self.tilt(for: pressed.union(emulator.keyboardButtons.intersection(Self.directions)))
+        let travel = size * 0.05
+        // A real pad rocks on a pivot under its center: the pressed arm dips, the opposite one rises.
+        let shape = DPadShape()
 
         ZStack {
-            MoldedCap(shape: DPadShape(), isPressed: !pressed.isEmpty || !emulator.keyboardButtons.isDisjoint(with: [.up, .down, .left, .right]), depth: size * 0.018)
-            ForEach(0..<4, id: \.self) { direction in
-                Capsule()
-                    .fill(Color(white: 0.74))
-                    .frame(width: 2, height: arm * 0.38)
-                    .shadow(color: .white, radius: 0, x: 1, y: 1)
-                    .offset(y: -size * 0.32)
-                    .rotationEffect(.degrees(Double(direction) * 90))
+            Well(shape: shape, gap: size * 0.016)
+            CastShadow(shape: shape, lift: travel, travel: travel, tilt: tilt)
+            ZStack {
+                CapSide(shape: shape, lift: travel, tilt: tilt)
+                CapFace(shape: shape, bevel: size * 0.028, gloss: false, dimmed: false) {
+                    DPadMarkings(size: size)
+                }
+                .overlay {
+                    // The dipping arm turns away from the light; the rising one catches more of it.
+                    LinearGradient(colors: [.black.opacity(0.13), .clear, .white.opacity(0.25)],
+                                   startPoint: UnitPoint(x: 0.5 + tilt.dx / 2, y: 0.5 + tilt.dy / 2),
+                                   endPoint: UnitPoint(x: 0.5 - tilt.dx / 2, y: 0.5 - tilt.dy / 2))
+                        .clipShape(shape)
+                        .opacity(tilt == .zero ? 0 : 1)
+                }
+                .modifier(Rock(tilt: tilt, lift: travel))
+                .offset(y: -travel)
             }
-            Circle()
-                .fill(RadialGradient(colors: [Color(white: 0.86), Color(white: 0.94)], center: .center, startRadius: 0, endRadius: arm * 0.25))
-                .frame(width: arm * 0.48, height: arm * 0.48)
         }
+        .animation(.spring(duration: 0.2, bounce: 0.35), value: tilt)
         .frame(width: size, height: size)
         .contentShape(Rectangle())
         .gesture(
@@ -138,6 +288,14 @@ struct DPad: View {
         .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: pressed) { old, new in
             !new.subtracting(old).isEmpty
         }
+    }
+
+    /// Which way the pad leans, as a unit vector in view coordinates (zero when centered).
+    private static func tilt(for held: Set<DSButton>) -> CGVector {
+        let dx = (held.contains(.right) ? 1.0 : 0) - (held.contains(.left) ? 1.0 : 0)
+        let dy = (held.contains(.down) ? 1.0 : 0) - (held.contains(.up) ? 1.0 : 0)
+        let length = hypot(dx, dy)
+        return length == 0 ? .zero : CGVector(dx: dx / length, dy: dy / length)
     }
 
     /// Maps a touch to up to two directions, so diagonals press both.
@@ -160,7 +318,33 @@ struct DPad: View {
         for button in newValue.subtracting(pressed) { emulator.press(button) }
         pressed = newValue
     }
+}
 
+/// A line molded into each arm, pointing along it, and the shallow dish at the pivot.
+private struct DPadMarkings: View {
+    let size: CGFloat
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<4, id: \.self) { direction in
+                Capsule()
+                    .fill(Color(white: 0.7).shadow(.inner(color: .black.opacity(0.35), radius: 0.6, y: 0.6)))
+                    .frame(width: size * 0.022, height: size * 0.12)
+                    .shadow(color: .white, radius: 0, y: 0.8)
+                    .offset(y: -size * 0.33)
+                    .rotationEffect(.degrees(Double(direction) * 90))
+            }
+            Circle()
+                .fill(LinearGradient(colors: [Color(white: 0.84), Color(white: 0.93), .white],
+                                     startPoint: .top, endPoint: .bottom))
+                .overlay {
+                    Circle().strokeBorder(LinearGradient(colors: [.black.opacity(0.12), .white],
+                                                         startPoint: .top, endPoint: .bottom),
+                                          lineWidth: size * 0.01)
+                }
+                .frame(width: size * 0.19, height: size * 0.19)
+        }
+    }
 }
 
 /// One continuous molded cross, with no overlapping rectangle seams.
@@ -174,7 +358,6 @@ nonisolated private struct DPadShape: InsettableShape {
     }
 
     func path(in bounds: CGRect) -> Path {
-        let rect = bounds.insetBy(dx: insetAmount, dy: insetAmount)
         let a: CGFloat = 0.34
         let b: CGFloat = 0.66
         let points: [CGPoint] = [
@@ -183,8 +366,13 @@ nonisolated private struct DPadShape: InsettableShape {
             CGPoint(x: b, y: 1), CGPoint(x: a, y: 1), CGPoint(x: a, y: b),
             CGPoint(x: 0, y: b), CGPoint(x: 0, y: a), CGPoint(x: a, y: a)
         ]
-        let vertices = points.map { CGPoint(x: rect.minX + $0.x * rect.width, y: rect.minY + $0.y * rect.height) }
-        let rounding = bounds.width * 0.014
+        // Every edge is axis-aligned, so offsetting the outline evenly moves each corner,
+        // convex or not, the same distance toward the center on both axes.
+        let vertices = points.map { point in
+            CGPoint(x: bounds.minX + point.x * bounds.width + (point.x < 0.5 ? insetAmount : -insetAmount),
+                    y: bounds.minY + point.y * bounds.height + (point.y < 0.5 ? insetAmount : -insetAmount))
+        }
+        let rounding = bounds.width * 0.03
         return Path { path in
             for index in vertices.indices {
                 let previous = vertices[(index + vertices.count - 1) % vertices.count]
@@ -192,8 +380,9 @@ nonisolated private struct DPadShape: InsettableShape {
                 let next = vertices[(index + 1) % vertices.count]
                 func near(_ point: CGPoint) -> CGPoint {
                     let length = hypot(point.x - current.x, point.y - current.y)
-                    return CGPoint(x: current.x + (point.x - current.x) * rounding / length,
-                                   y: current.y + (point.y - current.y) * rounding / length)
+                    let distance = min(rounding, length / 2)
+                    return CGPoint(x: current.x + (point.x - current.x) * distance / length,
+                                   y: current.y + (point.y - current.y) * distance / length)
                 }
                 let entry = near(previous)
                 if index == 0 { path.move(to: entry) } else { path.addLine(to: entry) }
@@ -206,23 +395,31 @@ nonisolated private struct DPadShape: InsettableShape {
 
 // MARK: - Small buttons
 
-struct PillButton: View {
-    let button: DSButton
-    let title: String
+/// START above SELECT, each a small round cap with its name molded beside it.
+struct SystemButtons: View {
     let emulator: DSEmulator
     let scale: CGFloat
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 4 * scale) {
+            row(.start, "START")
+            row(.select, "SELECT")
+        }
+    }
+
+    private func row(_ button: DSButton, _ title: String) -> some View {
         HardwareButton(button: button, emulator: emulator) { isPressed in
-            VStack(spacing: 3 * scale) {
-                MoldedCap(shape: Circle(), isPressed: isPressed, depth: 0.9 * scale)
-                    .frame(width: 16 * scale, height: 16 * scale)
+            HStack(spacing: 7 * scale) {
+                RaisedCap(shape: Circle(), isPressed: isPressed, travel: 2 * scale, bevel: 1.4 * scale) {
+                    EmptyView()
+                }
+                .frame(width: 15 * scale, height: 15 * scale)
                 Text(title)
-                    .font(.system(size: 8 * scale, weight: .medium))
-                    .kerning(0.5)
-                    .foregroundStyle(Palette.engraving)
+                    .font(HardwareFont.label(size: 8 * scale))
+                    .kerning(0.6 * scale)
+                    .engraved()
             }
-            .padding(6 * scale)
+            .padding(5 * scale)
         }
         .accessibilityLabel(title)
     }
@@ -237,20 +434,18 @@ struct ShoulderButton: View {
         let isLeft = button == .l
 
         HardwareButton(button: button, emulator: emulator) { isPressed in
-            MoldedCap(shape: UnevenRoundedRectangle(
-                topLeadingRadius: isLeft ? 10 * scale : 4 * scale,
+            RaisedCap(shape: UnevenRoundedRectangle(
+                topLeadingRadius: isLeft ? 11 * scale : 4 * scale,
                 bottomLeadingRadius: 4 * scale,
                 bottomTrailingRadius: 4 * scale,
-                topTrailingRadius: isLeft ? 4 * scale : 10 * scale,
+                topTrailingRadius: isLeft ? 4 * scale : 11 * scale,
                 style: .continuous
-            ), isPressed: isPressed, depth: 1.2 * scale)
-            .overlay {
+            ), isPressed: isPressed, travel: 3.2 * scale, bevel: 2.4 * scale, gloss: false) {
                 Text(isLeft ? "L" : "R")
-                    .font(.system(size: 11 * scale, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Palette.engraving)
+                    .font(HardwareFont.label(size: 11 * scale))
+                    .engraved(Color(white: 0.6))
             }
-            .frame(width: 33 * scale, height: 29 * scale)
-            .offset(y: isPressed ? 2 * scale : 0)
+            .frame(width: 36 * scale, height: 26 * scale)
         }
         .accessibilityLabel(isLeft ? "L" : "R")
     }

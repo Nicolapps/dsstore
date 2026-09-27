@@ -5,12 +5,14 @@ enum Palette {
     static let shellLight = Color(red: 0.99, green: 0.99, blue: 0.98)
     static let shellDark = Color(red: 0.82, green: 0.83, blue: 0.83)
     static let engraving = Color(red: 0.57, green: 0.58, blue: 0.56)
-    static let button = Color(white: 0.96)
-    static let buttonPressed = Color(white: 0.84)
-    static let buttonLabel = Color(red: 0.61, green: 0.62, blue: 0.58)
     static let ledOn = Color(red: 0.48, green: 0.88, blue: 0.25)
-    static let ledOff = Color(white: 0.42)
+    static let ledOff = Color(red: 0.66, green: 0.68, blue: 0.64)
     static let screenOff = Color(red: 0.13, green: 0.14, blue: 0.13)
+}
+
+/// The lettering molded into the shell and printed on the buttons.
+enum HardwareFont {
+    static func label(size: CGFloat) -> Font { .custom("DINAlternate-Bold", fixedSize: size) }
 }
 
 struct ConsoleView: View {
@@ -53,7 +55,7 @@ private struct ConsoleBody: View {
                         .frame(height: halfHeight)
                 }
                 Hinge(isOn: emulator.status == .running, scale: scale)
-                    .frame(height: 24 * scale)
+                    .frame(height: 42 * scale)
                     .position(x: proxy.size.width / 2, y: halfHeight)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
@@ -120,114 +122,198 @@ private struct TopHalf: View {
     var body: some View {
         ZStack {
             Shell(scale: scale, isTop: true)
-            VStack(spacing: 0) {
-                HStack {
-                    RubberFoot(scale: scale)
-                    Spacer()
-                    RubberFoot(scale: scale)
-                }
-                Spacer(minLength: 10 * scale)
-                HStack(spacing: 0) {
-                    SpeakerGrill(scale: scale).frame(maxWidth: .infinity)
-                    Screen(width: screenWidth, scale: scale) {
-                        if emulator.status == .stopped {
-                            OffGlass()
-                        } else {
-                            ScreenView(renderer: emulator.screenRenderer, screenIndex: 0)
-                                .overlay { StatusOverlay(status: emulator.status, scale: scale) }
-                        }
+            HStack(spacing: 0) {
+                SpeakerColumn(scale: scale, height: Screen<EmptyView>.height(for: screenWidth, scale: scale))
+                    .frame(maxWidth: .infinity)
+                Screen(width: screenWidth, scale: scale) {
+                    if emulator.status == .stopped {
+                        OffGlass()
+                    } else {
+                        ScreenView(renderer: emulator.screenRenderer, screenIndex: 0)
+                            .overlay { StatusOverlay(status: emulator.status, scale: scale) }
                     }
-                    SpeakerGrill(scale: scale).frame(maxWidth: .infinity)
                 }
-                Spacer(minLength: 10 * scale)
-                HStack {
-                    RubberFoot(scale: scale)
-                    Spacer()
-                    Capsule().fill(Color(white: 0.3)).frame(width: 3 * scale, height: 7 * scale)
-                        .shadow(color: .white, radius: 0, x: 1, y: 1)
-                    Spacer()
-                    RubberFoot(scale: scale)
-                }
+                SpeakerColumn(scale: scale, height: Screen<EmptyView>.height(for: screenWidth, scale: scale))
+                    .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 25 * scale)
+            .padding(.horizontal, 8 * scale)
             .padding(.top, max(topInset, 24 * scale))
-            .padding(.bottom, 29 * scale)
+            // Clear the hinge barrel, which overlaps the bottom of this half.
+            .padding(.bottom, 40 * scale)
         }
     }
 }
 
-private struct RubberFoot: View {
+/// Beside the top screen: a rubber bumper level with each corner of the screen, the speaker between them.
+private struct SpeakerColumn: View {
     let scale: CGFloat
-    var body: some View {
-        RoundedRectangle(cornerRadius: 3 * scale)
-            .fill(Color(white: 0.94))
-            .frame(width: 15 * scale, height: 9 * scale)
-            .overlay { RoundedRectangle(cornerRadius: 3 * scale).stroke(.black.opacity(0.06), lineWidth: 0.7) }
-            .shadow(color: .white, radius: 0.5, y: 1)
-    }
-}
+    let height: CGFloat
 
-private struct SpeakerGrill: View {
-    let scale: CGFloat
     var body: some View {
-        Grid(horizontalSpacing: 6 * scale, verticalSpacing: 7 * scale) {
-            ForEach(0..<2, id: \.self) { _ in
-                GridRow {
-                    ForEach(0..<3, id: \.self) { _ in
-                        Circle()
-                            .fill(Color(white: 0.23))
-                            .frame(width: 3 * scale, height: 3 * scale)
-                            .overlay { Circle().stroke(.black.opacity(0.5), lineWidth: 0.5) }
-                            .shadow(color: .white, radius: 0, x: 0.6, y: 1)
-                    }
-                }
-            }
+        VStack(spacing: 0) {
+            RubberFoot(scale: scale)
+            Spacer()
+            SpeakerGrill(scale: scale)
+            Spacer()
+            RubberFoot(scale: scale)
         }
+        .frame(height: height)
         .accessibilityHidden(true)
     }
 }
 
+/// A soft gray pad the lid closes onto, standing just proud of the shell.
+private struct RubberFoot: View {
+    let scale: CGFloat
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 2.5 * scale, style: .continuous)
+        shape
+            .fill(LinearGradient(colors: [Color(white: 0.91), Color(white: 0.84)], startPoint: .top, endPoint: .bottom))
+            .overlay {
+                shape.strokeBorder(LinearGradient(colors: [.white, .black.opacity(0.12)], startPoint: .top, endPoint: .bottom),
+                                   lineWidth: 0.8 * scale)
+            }
+            .frame(width: 13 * scale, height: 11 * scale)
+            .shadow(color: .black.opacity(0.18), radius: 0.8 * scale, y: 0.8 * scale)
+    }
+}
+
+/// Two rows of three holes punched through the shell, dark inside, their lower rims catching the light.
+private struct SpeakerGrill: View {
+    let scale: CGFloat
+    var body: some View {
+        Grid(horizontalSpacing: 13 * scale, verticalSpacing: 13 * scale) {
+            ForEach(0..<2, id: \.self) { _ in
+                GridRow {
+                    ForEach(0..<3, id: \.self) { _ in
+                        Circle()
+                            .fill(Color(white: 0.12).shadow(.inner(color: .black, radius: 1.2 * scale, y: 1.2 * scale)))
+                            .overlay {
+                                Circle().strokeBorder(LinearGradient(colors: [.black.opacity(0.35), .white],
+                                                                     startPoint: .top, endPoint: .bottom),
+                                                      lineWidth: 0.9 * scale)
+                            }
+                            .frame(width: 6.5 * scale, height: 6.5 * scale)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// The barrel the halves fold around: two knuckles on the lid, the long center barrel on the base.
 private struct Hinge: View {
     let isOn: Bool
     let scale: CGFloat
+
     var body: some View {
         ZStack {
-            Rectangle().fill(Color(white: 0.38)).frame(height: 7 * scale)
-            HStack(spacing: 2 * scale) {
-                barrel.frame(width: 31 * scale)
-                barrel.overlay {
-                    HStack {
-                        Text("MIC.").font(.system(size: 6 * scale, weight: .medium))
-                            .foregroundStyle(Palette.engraving)
-                        Capsule().fill(Color(white: 0.32)).frame(width: 8 * scale, height: 2 * scale)
-                        Spacer()
-                        RoundedRectangle(cornerRadius: scale)
-                            .fill(isOn ? Palette.ledOn : Palette.ledOff)
-                            .frame(width: 4 * scale, height: 9 * scale)
-                            .shadow(color: isOn ? Palette.ledOn.opacity(0.5) : .clear, radius: 3 * scale)
-                        RoundedRectangle(cornerRadius: scale)
-                            .fill(Color(red: 0.61, green: 0.64, blue: 0.52))
-                            .frame(width: 4 * scale, height: 9 * scale)
-                    }.padding(.horizontal, 18 * scale)
-                }
-                barrel.frame(width: 31 * scale)
+            // The gap between the halves, in the barrel's shadow.
+            LinearGradient(colors: [Color(white: 0.3), Color(white: 0.12), Color(white: 0.3)],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(height: 24 * scale)
+            HStack(spacing: 1.4 * scale) {
+                HingeBarrel(scale: scale)
+                    .frame(width: 62 * scale)
+                HingeBarrel(scale: scale)
+                    .overlay { Microphone(scale: scale) }
+                HingeBarrel(scale: scale)
+                    .frame(width: 62 * scale)
+                    .overlay { IndicatorLights(isOn: isOn, scale: scale) }
             }
-            .padding(.horizontal, 13 * scale)
         }
+        .compositingGroup()
+        .shadow(color: .black.opacity(0.3), radius: 3 * scale, y: 4 * scale)
+    }
+}
+
+/// A glossy white cylinder seen side-on, lit from above, its rounded ends rolling out of the light.
+private struct HingeBarrel: View {
+    let scale: CGFloat
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 10 * scale, style: .continuous)
+        shape
+            .fill(LinearGradient(stops: [
+                .init(color: Color(white: 0.6), location: 0),
+                .init(color: Color(white: 0.86), location: 0.1),
+                .init(color: Color(white: 0.99), location: 0.26),
+                .init(color: Color(white: 0.96), location: 0.4),
+                .init(color: Color(white: 0.9), location: 0.62),
+                .init(color: Color(white: 0.76), location: 0.84),
+                .init(color: Color(white: 0.62), location: 1)
+            ], startPoint: .top, endPoint: .bottom))
+            .overlay {
+                // The sharp reflection of the light running along the top of the barrel.
+                Capsule()
+                    .fill(.white)
+                    .frame(height: 2 * scale)
+                    .blur(radius: 0.6 * scale)
+                    .padding(.horizontal, 7 * scale)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .padding(.top, 8.5 * scale)
+            }
+            .overlay {
+                HStack {
+                    LinearGradient(colors: [.black.opacity(0.2), .clear], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: 9 * scale)
+                    Spacer()
+                    LinearGradient(colors: [.clear, .black.opacity(0.2)], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: 9 * scale)
+                }
+            }
+            .clipShape(shape)
+            .overlay { shape.stroke(.black.opacity(0.2), lineWidth: 0.6) }
+    }
+}
+
+/// The microphone slit sits dead center, its label molded beside it.
+private struct Microphone: View {
+    let scale: CGFloat
+
+    var body: some View {
+        Capsule()
+            .fill(Color(white: 0.1).shadow(.inner(color: .black, radius: 0.8 * scale, y: 0.8 * scale)))
+            .overlay {
+                Capsule().strokeBorder(LinearGradient(colors: [.clear, .white.opacity(0.9)], startPoint: .top, endPoint: .bottom),
+                                       lineWidth: 0.6 * scale)
+            }
+            .frame(width: 2.8 * scale, height: 10 * scale)
+            .overlay(alignment: .leading) {
+                Text("MIC.")
+                    .font(HardwareFont.label(size: 6.5 * scale))
+                    .kerning(0.4 * scale)
+                    .engraved()
+                    .fixedSize()
+                    .offset(x: 6 * scale)
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+/// The power and charge lamps, set into the right knuckle.
+private struct IndicatorLights: View {
+    let isOn: Bool
+    let scale: CGFloat
+
+    var body: some View {
+        HStack(spacing: 3 * scale) {
+            lamp(color: isOn ? Palette.ledOn : nil)
+            lamp(color: nil)
+        }
+        .accessibilityHidden(true)
     }
 
-    private var barrel: some View {
-        RoundedRectangle(cornerRadius: 7 * scale)
-            .fill(LinearGradient(stops: [
-                .init(color: Color(white: 0.67), location: 0),
-                .init(color: Color(white: 0.93), location: 0.18),
-                .init(color: .white, location: 0.35),
-                .init(color: Color(white: 0.9), location: 0.6),
-                .init(color: Color(white: 0.65), location: 0.92),
-                .init(color: Color(white: 0.81), location: 1)
-            ], startPoint: .top, endPoint: .bottom))
-            .overlay { RoundedRectangle(cornerRadius: 7 * scale).stroke(.black.opacity(0.15), lineWidth: 0.6) }
-            .shadow(color: .black.opacity(0.25), radius: 2 * scale, y: 3 * scale)
+    private func lamp(color: Color?) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 1.2 * scale, style: .continuous)
+        return shape
+            .fill((color ?? Palette.ledOff).shadow(.inner(color: .black.opacity(0.25), radius: 0.8 * scale, y: 0.6 * scale)))
+            .overlay {
+                shape.fill(LinearGradient(colors: [.white.opacity(0.55), .clear], startPoint: .top, endPoint: .center))
+            }
+            .overlay { shape.strokeBorder(.black.opacity(0.25), lineWidth: 0.5) }
+            .frame(width: 2.6 * scale, height: 9 * scale)
+            .shadow(color: color?.opacity(0.8) ?? .clear, radius: 3 * scale)
     }
 }
 
@@ -238,51 +324,46 @@ private struct BottomHalf: View {
     let bottomInset: CGFloat
 
     var body: some View {
-        ZStack {
+        let screenHeight = Screen<EmptyView>.height(for: screenWidth, scale: scale)
+        let faceSize = 114 * scale
+        let padSize = 100 * scale
+        // The D-pad and face buttons sit level with each other, a little above the screen's middle.
+        let controlsCenter = screenHeight * 0.38
+
+        ZStack(alignment: .top) {
             Shell(scale: scale, isTop: false)
-            VStack(spacing: 12 * scale) {
-                // The D-pad and face buttons flank the touch screen, each centered in its side gutter.
-                HStack(spacing: 0) {
-                    DPad(emulator: emulator, size: 104 * scale)
-                        .frame(maxWidth: .infinity)
-                    Screen(width: screenWidth, scale: scale) {
-                        // Without a game inserted, the console stays off.
-                        if emulator.status == .stopped {
-                            OffGlass()
-                        } else {
-                            ScreenView(renderer: emulator.screenRenderer, screenIndex: 1)
-                                .overlay { TouchSurface(emulator: emulator) }
-                        }
-                    }
-                    FaceButtons(emulator: emulator, size: 114 * scale)
-                        .frame(maxWidth: .infinity)
-                }
-                .padding(.horizontal, 8 * scale)
-                VStack(spacing: 12 * scale) {
-                    Text("Nintendo")
-                        .font(.system(size: 10 * scale, weight: .semibold, design: .rounded))
-                        .padding(.horizontal, 7 * scale).padding(.vertical, 1 * scale)
-                        .overlay { Capsule().stroke(Palette.engraving.opacity(0.6), lineWidth: 1) }
-                        .accessibilityHidden(true)
-                    HStack(spacing: 8 * scale) {
-                        PillButton(button: .select, title: "SELECT", emulator: emulator, scale: scale)
-                        PillButton(button: .start, title: "START", emulator: emulator, scale: scale)
+            HStack(alignment: .top, spacing: 0) {
+                DPad(emulator: emulator, size: padSize)
+                    .padding(.top, controlsCenter - padSize / 2)
+                    .frame(maxWidth: .infinity)
+                Screen(width: screenWidth, scale: scale) {
+                    // Without a game inserted, the console stays off.
+                    if emulator.status == .stopped {
+                        OffGlass()
+                    } else {
+                        ScreenView(renderer: emulator.screenRenderer, screenIndex: 1)
+                            .overlay { TouchSurface(emulator: emulator) }
                     }
                 }
-                .foregroundStyle(Palette.engraving)
+                VStack(spacing: 0) {
+                    FaceButtons(emulator: emulator, size: faceSize)
+                        .padding(.top, controlsCenter - faceSize / 2)
+                    Spacer(minLength: 0)
+                    SystemButtons(emulator: emulator, scale: scale)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: screenHeight)
             }
-            .padding(.top, 28 * scale)
-            .padding(.bottom, bottomInset)
-            .frame(maxHeight: .infinity, alignment: .top)
+            .padding(.horizontal, 8 * scale)
+            .padding(.top, 50 * scale)
 
             HStack {
                 ShoulderButton(button: .l, emulator: emulator, scale: scale)
                 Spacer()
                 ShoulderButton(button: .r, emulator: emulator, scale: scale)
             }
-            .padding(.horizontal, 19 * scale)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .padding(.top, 23 * scale)
+            .padding(.horizontal, 18 * scale)
+            .padding(.top, 30 * scale)
         }
     }
 }
@@ -306,6 +387,9 @@ private struct Screen<Content: View>: View {
     let width: CGFloat
     let scale: CGFloat
     @ViewBuilder let content: Content
+
+    /// The height of the whole bezel around an LCD `width` wide.
+    static func height(for width: CGFloat, scale: CGFloat) -> CGFloat { width * 3 / 4 + 20 * scale }
 
     var body: some View {
         content
