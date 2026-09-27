@@ -80,9 +80,9 @@ private struct Well<S: InsettableShape>: View {
 
     var body: some View {
         let hole = shape.inset(by: -gap)
-        hole.fill(Color(white: 0.36).shadow(.inner(color: .black.opacity(0.75), radius: gap * 1.4, y: gap)))
+        hole.fill(Color(white: 0.64).shadow(.inner(color: .black.opacity(0.35), radius: gap * 1.4, y: gap)))
             .overlay {
-                hole.strokeBorder(LinearGradient(colors: [.black.opacity(0.3), .black.opacity(0.05), .white],
+                hole.strokeBorder(LinearGradient(colors: [.black.opacity(0.12), .clear, .white],
                                                  startPoint: .top, endPoint: .bottom),
                                   lineWidth: max(0.6, gap * 0.45))
             }
@@ -98,7 +98,7 @@ private struct CastShadow<S: Shape>: View {
 
     var body: some View {
         let height = lift / travel
-        shape.fill(.black.opacity(0.22 + 0.2 * height))
+        shape.fill(.black.opacity(0.1 + 0.1 * height))
             .blur(radius: travel * (0.25 + 0.6 * height))
             .offset(x: -tilt.dx * travel * 0.3, y: travel * (0.12 + 0.45 * height) - tilt.dy * travel * 0.3)
     }
@@ -117,17 +117,17 @@ private struct CapSide<S: Shape>: View {
                 let height = CGFloat(step) / CGFloat(steps)
                 shape
                     .fill(LinearGradient(stops: [
-                        .init(color: Color(white: 0.52), location: 0),
-                        .init(color: Color(white: 0.72), location: 0.22),
-                        .init(color: Color(white: 0.80), location: 0.5),
-                        .init(color: Color(white: 0.69), location: 0.8),
-                        .init(color: Color(white: 0.50), location: 1)
+                        .init(color: Color(white: 0.76), location: 0),
+                        .init(color: Color(white: 0.85), location: 0.22),
+                        .init(color: Color(white: 0.9), location: 0.5),
+                        .init(color: Color(white: 0.84), location: 0.8),
+                        .init(color: Color(white: 0.75), location: 1)
                     ], startPoint: .leading, endPoint: .trailing))
                     .modifier(Rock(tilt: tilt, lift: lift * height))
                     .offset(y: -lift * height)
             }
             // Where the wall meets the well.
-            shape.stroke(.black.opacity(0.22), lineWidth: 0.6)
+            shape.stroke(.black.opacity(0.1), lineWidth: 0.6)
         }
     }
 }

@@ -6,7 +6,7 @@ enum Palette {
     static let shellDark = Color(red: 0.82, green: 0.83, blue: 0.83)
     static let engraving = Color(white: 0.64)
     static let ledOn = Color(red: 0.48, green: 0.88, blue: 0.25)
-    static let ledOff = Color(red: 0.66, green: 0.68, blue: 0.64)
+    static let ledOff = Color(red: 0.8, green: 0.81, blue: 0.78)
     static let screenOff = Color(red: 0.13, green: 0.14, blue: 0.13)
 }
 
@@ -98,13 +98,29 @@ private struct Shell: View {
                 .fill(LinearGradient(stops: [
                     .init(color: Color(red: 0.98, green: 0.98, blue: 0.965), location: 0),
                     .init(color: Color(red: 0.94, green: 0.945, blue: 0.93), location: 0.48),
-                    .init(color: Color(red: 0.86, green: 0.875, blue: 0.86), location: 1)
+                    .init(color: Color(red: 0.89, green: 0.9, blue: 0.89), location: 1)
                 ], startPoint: .topLeading, endPoint: .bottomTrailing))
                 .overlay {
                     contour.stroke(.white.opacity(0.85), lineWidth: 0.8 * scale)
                 }
                 .padding(3 * scale)
-            // Fine parting line where the polished lip meets the satin faceplate.
+            // The open halves lie in one plane, so they share one reflection: each half draws its part of it.
+            ZStack {
+                GeometryReader { proxy in
+                    Gloss()
+                        .frame(width: proxy.size.width, height: proxy.size.height * 2)
+                        .offset(y: isTop ? 0 : -proxy.size.height)
+                }
+                // The faceplate rolls over into the lip: bright where the curve faces the light, dimmer where it turns away.
+                contour
+                    .stroke(LinearGradient(colors: [.white, .white.opacity(0.3), .black.opacity(0.08)],
+                                           startPoint: .topLeading, endPoint: .bottomTrailing),
+                            lineWidth: 5 * scale)
+                    .blur(radius: 1.2 * scale)
+            }
+            .clipShape(contour)
+            .padding(3 * scale)
+            // Fine parting line where the polished lip meets the faceplate.
             contour.stroke(Color.black.opacity(0.12), lineWidth: 0.6 * scale)
                 .padding(6 * scale)
             contour.stroke(.white.opacity(0.65), lineWidth: 0.7 * scale)
@@ -112,6 +128,22 @@ private struct Shell: View {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// A soft window reflection across the polished white plastic: a broad glow in the upper corner
+/// and a narrower diagonal band, fading toward the far corner.
+private struct Gloss: View {
+    var body: some View {
+        LinearGradient(stops: [
+            .init(color: .white.opacity(0.6), location: 0),
+            .init(color: .white.opacity(0.15), location: 0.16),
+            .init(color: .black.opacity(0.035), location: 0.33),
+            .init(color: .white.opacity(0.5), location: 0.42),
+            .init(color: .white.opacity(0.55), location: 0.45),
+            .init(color: .black.opacity(0.02), location: 0.56),
+            .init(color: .black.opacity(0.05), location: 1)
+        ], startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 }
 
@@ -206,69 +238,91 @@ private struct SpeakerGrill: View {
     }
 }
 
-/// The barrel the halves fold around: two knuckles on the lid, the long center barrel on the base.
+/// The barrel the halves fold around. The long middle barrel is the lid's bottom edge; the two knuckles,
+/// a little thicker, rise from the base's corners. They butt against each other at straight seams.
 private struct Hinge: View {
     let isOn: Bool
     let scale: CGFloat
 
     var body: some View {
-        ZStack {
-            // The gap between the halves, in the barrel's shadow.
-            LinearGradient(colors: [Color(white: 0.3), Color(white: 0.12), Color(white: 0.3)],
-                           startPoint: .top, endPoint: .bottom)
-                .frame(height: 24 * scale)
-            HStack(spacing: 1.4 * scale) {
-                HingeBarrel(scale: scale)
-                    .frame(width: 62 * scale)
-                HingeBarrel(scale: scale)
-                    .overlay { Microphone(scale: scale) }
-                HingeBarrel(scale: scale)
-                    .frame(width: 62 * scale)
-                    .overlay { IndicatorLights(isOn: isOn, scale: scale) }
-            }
+        HStack(spacing: 0) {
+            HingeBarrel(outerEnd: .leading, scale: scale)
+                .frame(width: 50 * scale)
+            HingeBarrel(outerEnd: nil, scale: scale)
+                .padding(.vertical, 2.5 * scale)
+                .shadow(color: .black.opacity(0.28), radius: 2.5 * scale, y: 3 * scale)
+                .overlay { Microphone(scale: scale) }
+                .zIndex(-1)
+            HingeBarrel(outerEnd: .trailing, scale: scale)
+                .frame(width: 50 * scale)
+                .overlay(alignment: .leading) {
+                    IndicatorLights(isOn: isOn, scale: scale)
+                        .padding(.leading, 9 * scale)
+                }
         }
-        .compositingGroup()
-        .shadow(color: .black.opacity(0.3), radius: 3 * scale, y: 4 * scale)
+        .shadow(color: .black.opacity(0.12), radius: 1.5 * scale, y: 1.5 * scale)
     }
 }
 
-/// A glossy white cylinder seen side-on, lit from above, its rounded ends rolling out of the light.
+/// A glossy white cylinder seen side-on, lit from above. Only a free end is rounded; where it meets
+/// another part it's cut square, with a fine shadowed seam.
 private struct HingeBarrel: View {
+    let outerEnd: HorizontalEdge?
     let scale: CGFloat
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 10 * scale, style: .continuous)
+        let radius = 11 * scale
+        let shape = UnevenRoundedRectangle(
+            topLeadingRadius: outerEnd == .leading ? radius : 0,
+            bottomLeadingRadius: outerEnd == .leading ? radius : 0,
+            bottomTrailingRadius: outerEnd == .trailing ? radius : 0,
+            topTrailingRadius: outerEnd == .trailing ? radius : 0,
+            style: .continuous
+        )
         shape
             .fill(LinearGradient(stops: [
-                .init(color: Color(white: 0.6), location: 0),
-                .init(color: Color(white: 0.86), location: 0.1),
-                .init(color: Color(white: 0.99), location: 0.26),
-                .init(color: Color(white: 0.96), location: 0.4),
-                .init(color: Color(white: 0.9), location: 0.62),
-                .init(color: Color(white: 0.76), location: 0.84),
-                .init(color: Color(white: 0.62), location: 1)
+                .init(color: Color(white: 0.78), location: 0),
+                .init(color: Color(white: 0.93), location: 0.12),
+                .init(color: Color(white: 1), location: 0.3),
+                .init(color: Color(white: 0.96), location: 0.45),
+                .init(color: Color(white: 0.9), location: 0.66),
+                .init(color: Color(white: 0.8), location: 0.86),
+                .init(color: Color(white: 0.68), location: 1)
             ], startPoint: .top, endPoint: .bottom))
             .overlay {
                 // The sharp reflection of the light running along the top of the barrel.
-                Capsule()
+                Rectangle()
                     .fill(.white)
-                    .frame(height: 2 * scale)
+                    .frame(height: 1.8 * scale)
                     .blur(radius: 0.6 * scale)
-                    .padding(.horizontal, 7 * scale)
                     .frame(maxHeight: .infinity, alignment: .top)
-                    .padding(.top, 8.5 * scale)
+                    .padding(.top, 9 * scale)
             }
             .overlay {
-                HStack {
-                    LinearGradient(colors: [.black.opacity(0.2), .clear], startPoint: .leading, endPoint: .trailing)
-                        .frame(width: 9 * scale)
-                    Spacer()
-                    LinearGradient(colors: [.clear, .black.opacity(0.2)], startPoint: .leading, endPoint: .trailing)
-                        .frame(width: 9 * scale)
+                // A free end rolls out of the light; a cut end shows as a crisp seam.
+                HStack(spacing: 0) {
+                    end(outerEnd == .leading, towardTrailing: false)
+                    Spacer(minLength: 0)
+                    end(outerEnd == .trailing, towardTrailing: true)
                 }
             }
             .clipShape(shape)
-            .overlay { shape.stroke(.black.opacity(0.2), lineWidth: 0.6) }
+            .overlay { shape.stroke(.black.opacity(0.14), lineWidth: 0.6) }
+    }
+
+    @ViewBuilder private func end(_ isFree: Bool, towardTrailing: Bool) -> some View {
+        if isFree {
+            LinearGradient(colors: [.black.opacity(0.22), .clear],
+                           startPoint: towardTrailing ? .trailing : .leading,
+                           endPoint: towardTrailing ? .leading : .trailing)
+                .frame(width: 10 * scale)
+        } else {
+            HStack(spacing: 0) {
+                if towardTrailing { Rectangle().fill(.white.opacity(0.8)).frame(width: 0.6 * scale) }
+                Rectangle().fill(.black.opacity(0.22)).frame(width: 0.8 * scale)
+                if !towardTrailing { Rectangle().fill(.white.opacity(0.8)).frame(width: 0.6 * scale) }
+            }
+        }
     }
 }
 
@@ -296,29 +350,48 @@ private struct Microphone: View {
     }
 }
 
-/// The power and charge lamps, set into the right knuckle.
+/// The right knuckle's ribbing: fine grooves ringing the barrel, with the power and charge
+/// lamps as translucent bands among them.
 private struct IndicatorLights: View {
     let isOn: Bool
     let scale: CGFloat
 
     var body: some View {
         HStack(spacing: 3 * scale) {
+            groove
+            groove
             lamp(color: isOn ? Palette.ledOn : nil)
             lamp(color: nil)
+        }
+        .padding(.vertical, 2 * scale)
+        // The rings wrap around the cylinder, so they fade out as it curves away at the top and bottom.
+        .mask {
+            LinearGradient(stops: [
+                .init(color: .clear, location: 0),
+                .init(color: .black, location: 0.3),
+                .init(color: .black, location: 0.72),
+                .init(color: .clear, location: 1)
+            ], startPoint: .top, endPoint: .bottom)
         }
         .accessibilityHidden(true)
     }
 
+    /// A cut into the barrel: its left wall in shadow, its right edge catching the light.
+    private var groove: some View {
+        HStack(spacing: 0) {
+            Rectangle().fill(.black.opacity(0.3)).frame(width: 0.8 * scale)
+            Rectangle().fill(.white).frame(width: 0.7 * scale)
+        }
+    }
+
     private func lamp(color: Color?) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 1.2 * scale, style: .continuous)
-        return shape
-            .fill((color ?? Palette.ledOff).shadow(.inner(color: .black.opacity(0.25), radius: 0.8 * scale, y: 0.6 * scale)))
-            .overlay {
-                shape.fill(LinearGradient(colors: [.white.opacity(0.55), .clear], startPoint: .top, endPoint: .center))
-            }
-            .overlay { shape.strokeBorder(.black.opacity(0.25), lineWidth: 0.5) }
-            .frame(width: 2.6 * scale, height: 9 * scale)
-            .shadow(color: color?.opacity(0.8) ?? .clear, radius: 3 * scale)
+        Rectangle()
+            .fill(LinearGradient(colors: [(color ?? Palette.ledOff).opacity(0.75), color ?? Palette.ledOff,
+                                          (color ?? Palette.ledOff).opacity(0.8)],
+                                 startPoint: .top, endPoint: .bottom))
+            .overlay(alignment: .leading) { Rectangle().fill(.black.opacity(0.18)).frame(width: 0.5 * scale) }
+            .frame(width: 2.4 * scale)
+            .shadow(color: color?.opacity(0.9) ?? .clear, radius: 2.5 * scale)
     }
 }
 
