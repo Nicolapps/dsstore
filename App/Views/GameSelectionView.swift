@@ -146,35 +146,16 @@ private struct StoreHeader: View {
     }
 }
 
-/// Familiar dual-screen geometry, with an original store wordmark.
+/// The Nintendo DS wordmark's own shapes, respelled: the top screen doubles as the O of STORE.
 private struct DSStoreLogo: View {
     let scale: CGFloat
     var body: some View {
-        HStack(alignment: .center, spacing: 9 * scale) {
-            // Tighten only the pair: tracking the whole word also trims the S's trailing edge off its frame.
-            Text("\(Text("D").tracking(-4 * scale))S")
-                .font(.system(size: 54 * scale, weight: .medium, design: .rounded))
-                .padding(.trailing, -4 * scale)
-            VStack(spacing: 3 * scale) {
-                ForEach(0..<2) { _ in
-                    RoundedRectangle(cornerRadius: 2 * scale)
-                        .fill(LinearGradient(colors: [Color(white: 0.87), Color(white: 0.96)],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 2 * scale)
-                                .strokeBorder(Color(white: 0.44), lineWidth: 1.7 * scale)
-                        }
-                }
-            }
-            .frame(width: 17 * scale, height: 35 * scale)
-            Text("STORE")
-                .font(.system(size: 33 * scale, weight: .light))
-                .tracking(-1.5 * scale)
-        }
-        .foregroundStyle(Color(white: 0.12))
-        .shadow(color: .white.opacity(0.95), radius: 0, y: scale)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("DS Store")
+        Image("DSStoreLogo")
+            .resizable()
+            .scaledToFit()
+            .frame(height: 44 * scale)
+            .shadow(color: .white.opacity(0.95), radius: 0, y: scale)
+            .accessibilityLabel("DS Store")
     }
 }
 
