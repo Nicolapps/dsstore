@@ -63,3 +63,10 @@ static float positiveMod(float x, float m) {
     // Premultiplied: white where the brushing is lighter, black where it's darker.
     return shade > 0 ? half4(half3(shade), half(shade)) : half4(0, 0, 0, half(-shade));
 }
+
+/// Paper fibres, for the back of a case's insert seen through the plastic.
+[[stitchable]] half4 paperFibers(float2 position) {
+    float fibres = 0.5 * valueNoise(position * 0.35) + 0.5 * hash(floor(position * 5));
+    float shade = (fibres - 0.5) * 0.045;
+    return shade > 0 ? half4(half3(shade), half(shade)) : half4(0, 0, 0, half(-shade));
+}
