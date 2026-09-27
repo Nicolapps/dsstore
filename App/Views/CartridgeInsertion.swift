@@ -305,7 +305,8 @@ private struct InsertionStage: View, Animatable {
         let pose = casePose(at: insertion)
         let shelved = easeInOut(insertion.through(Beat.shelve))
         let elevation = min(1, 2 * pose.openness)
-        return OpeningCase(game: game, openness: pose.openness, holdsCard: insertion < Beat.card.lowerBound, clipFlex: clipFlex)
+        return OpeningCase(game: game, openness: pose.openness, holdsCard: insertion < Beat.card.lowerBound,
+                           clipFlex: clipFlex, detail: layout.openCaseWidth / CaseMetrics.width)
             .frame(width: CaseMetrics.width, height: CaseMetrics.height)
             .scaleEffect(pose.width / CaseMetrics.width)
             .shadow(color: .black.opacity(0.45 * elevation), radius: 18 * elevation, y: 12 * elevation)
@@ -431,11 +432,29 @@ private struct OpeningCase: View {
     let game: DisplayGame
     let openness: Double
     let holdsCard: Bool
-    var clipFlex: Double = 0
+    let clipFlex: Double
+    /// How much larger than its own units the case gets, so its insides are drawn sharp at that size.
+    let detail: CGFloat
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         let turn = sin(openness * .pi)
-        CaseTray(game: game, holdsCard: holdsCard, clipFlex: clipFlex)
+        let resolution = (displayScale * detail * 4).rounded(.up) / 4
+        ZStack {
+            CaseInteriors.snapshot("tray", resolution: resolution) { TrayShell() }
+            if holdsCard {
+                GameCard(game: game)
+                    .frame(width: GameCard.width, height: GameCard.width * GameCard.aspect)
+                    .scaleEffect(CaseMetrics.cardWidth / GameCard.width)
+                    .shadow(color: .black.opacity(0.45), radius: 0.5, y: 0.5)
+                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1.5)
+                    .position(CaseMetrics.cardCenter)
+            }
+            Molding(path: TrayShell.cardClips(flex: clipFlex))
+                .compositingGroup()
+                .shadow(color: .black.opacity(0.35), radius: 0.6, y: 0.8)
+        }
+        .frame(width: CaseMetrics.width, height: CaseMetrics.height)
             // The raised cover shades the tray next to the spine.
             .overlay(alignment: .leading) {
                 LinearGradient(colors: [.black.opacity(0.5 * turn), .clear], startPoint: .leading, endPoint: .trailing)
@@ -445,7 +464,8 @@ private struct OpeningCase: View {
                 ZStack {
                     GameCase(game: game, scale: 1)
                         .opacity(openness < 0.5 ? 1 : 0)
-                    CoverInside(game: game)
+                    CaseInteriors.snapshot("cover-\(game.id)", resolution: resolution) { CoverInside(game: game) }
+                        .frame(width: CaseMetrics.width, height: CaseMetrics.height)
                         .scaleEffect(x: -1)
                         .opacity(openness < 0.5 ? 0 : 1)
                 }
@@ -454,6 +474,33 @@ private struct OpeningCase: View {
                 .rotation3DEffect(.degrees(-180 * openness), axis: (x: 0, y: 1, z: 0),
                                   anchor: .leading, perspective: 0.45)
             }
+    }
+}
+
+/// The insides of the case's halves, drawn once at the size the case opens to and then only moved:
+/// their shading and cut-outs cost far too much to draw again every frame.
+@MainActor private enum CaseInteriors {
+    private static var images: [String: Image] = [:]
+
+    @ViewBuilder
+    static func snapshot(_ name: String, resolution: CGFloat, content: () -> some View) -> some View {
+        if let image = image(name, resolution: resolution, content: content) {
+            image.resizable()
+        } else {
+            content()
+        }
+    }
+
+    private static func image(_ name: String, resolution: CGFloat, content: () -> some View) -> Image? {
+        let key = "\(name)@\(resolution)"
+        if let image = images[key] { return image }
+        let renderer = ImageRenderer(content: content().frame(width: CaseMetrics.width, height: CaseMetrics.height))
+        renderer.scale = resolution
+        guard let image = renderer.uiImage.map(Image.init(uiImage:)) else { return nil }
+        // Only the case in hand matters; the tray is shared by all of them.
+        if images.count > 8 { images.removeAll() }
+        images[key] = image
+        return image
     }
 }
 
@@ -548,12 +595,8 @@ private struct ShellHalf: View {
 
 /// The tray: the spine, and beside it the cradle the card clips into, the pair of clips for a Game Boy Advance
 /// cartridge above it, and the latch the cover closes on.
-private struct CaseTray: View {
-    let game: DisplayGame
-    let holdsCard: Bool
-    /// How far the clips holding the card are pushed outwards, springing back once it's out.
-    let clipFlex: Double
-
+/// The card and the clips over it are drawn on top, since they move.
+private struct TrayShell: View {
     private static let w = CaseMetrics.width
     private static let h = CaseMetrics.height
     private static let spine = CaseMetrics.spineWidth
@@ -577,7 +620,7 @@ private struct CaseTray: View {
             ShellGloss(span: -1...1)
             scoopFloor
             ZStack {
-                cradleFloor.opacity(holdsCard ? 0 : 1)
+                cradleFloor
                 Molding(path: cradle)
                 Molding(path: cartridgeClips)
                 Molding(path: latch)
@@ -585,17 +628,6 @@ private struct CaseTray: View {
             }
             .compositingGroup()
             .shadow(color: .black.opacity(0.3), radius: 0.7, y: 0.9)
-            if holdsCard {
-                GameCard(game: game)
-                    .frame(width: GameCard.width, height: GameCard.width * GameCard.aspect)
-                    .scaleEffect(CaseMetrics.cardWidth / GameCard.width)
-                    .shadow(color: .black.opacity(0.45), radius: 0.5, y: 0.5)
-                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1.5)
-                    .position(CaseMetrics.cardCenter)
-            }
-            Molding(path: cardClips)
-                .compositingGroup()
-                .shadow(color: .black.opacity(0.35), radius: 0.6, y: 0.8)
         }
         .frame(width: w, height: h)
         .clipShape(UnevenRoundedRectangle(cornerRadii: RectangleCornerRadii(bottomTrailing: corner, topTrailing: corner)))
@@ -657,9 +689,10 @@ private struct CaseTray: View {
             .clipShape(circle(Self.scoop, radius).subtracting(rounded(Self.pocket, 1)))
     }
 
-    /// Two small tabs over each end of the card, which it's pressed past to go in and come out.
-    private var cardClips: Path {
-        let pocket = Self.pocket, flex = 1.3 * clipFlex
+    /// Two small tabs over each end of the card, which it's pressed past to go in and come out,
+    /// pushed `flex` of the way outwards.
+    static func cardClips(flex: Double) -> Path {
+        let pocket = Self.pocket, flex = 1.3 * flex
         let size = CGSize(width: 8, height: 3.8)
         var path = Path()
         for x in [pocket.minX + 8, pocket.maxX - 12] {
