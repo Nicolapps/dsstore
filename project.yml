@@ -34,7 +34,7 @@ targets:
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: DS
+        CFBundleDisplayName: DS Store
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
@@ -50,10 +50,11 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         UIStatusBarHidden: true
         NSMicrophoneUsageDescription: Some games ask you to blow or speak into the microphone.
+        NSCameraUsageDescription: The camera keeps the back of the console visible on the outer display.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.ettlin.nicolas.dsstore
-        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
         SWIFT_APPROACHABLE_CONCURRENCY: YES
