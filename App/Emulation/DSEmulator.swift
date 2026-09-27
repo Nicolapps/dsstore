@@ -38,6 +38,9 @@ final class DSEmulator {
 
     private(set) var status: Status = .stopped
 
+    /// Buttons currently held on a hardware keyboard, so the on-screen controls can show them pressed.
+    private(set) var keyboardButtons: Set<DSButton> = []
+
     /// Draws both screens from the emulator's frames.
     let screenRenderer = ScreenRenderer()
 
@@ -109,6 +112,16 @@ final class DSEmulator {
 
     func release(_ button: DSButton) {
         bridge.deactivateInput(button.input.rawValue, playerIndex: 0)
+    }
+
+    func setKeyboardButton(_ button: DSButton, pressed: Bool) {
+        if pressed {
+            guard keyboardButtons.insert(button).inserted else { return }
+            press(button)
+        } else {
+            guard keyboardButtons.remove(button) != nil else { return }
+            release(button)
+        }
     }
 
     /// Touches the bottom screen at a point normalized to 0...1 on both axes.

@@ -25,7 +25,7 @@ private struct HardwareButton<Label: View>: View {
     @State private var isPressed = false
 
     var body: some View {
-        label(isPressed)
+        label(isPressed || emulator.keyboardButtons.contains(button))
             .modifier(HoldGesture(isPressed: $isPressed))
             .onChange(of: isPressed) { _, pressed in
                 if pressed { emulator.press(button) } else { emulator.release(button) }
@@ -113,7 +113,7 @@ struct DPad: View {
         let arm = size * 0.34
 
         ZStack {
-            MoldedCap(shape: DPadShape(), isPressed: !pressed.isEmpty, depth: size * 0.018)
+            MoldedCap(shape: DPadShape(), isPressed: !pressed.isEmpty || !emulator.keyboardButtons.isDisjoint(with: [.up, .down, .left, .right]), depth: size * 0.018)
             ForEach(0..<4, id: \.self) { direction in
                 Capsule()
                     .fill(Color(white: 0.74))

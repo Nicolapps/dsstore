@@ -30,7 +30,7 @@ private struct KeyboardControls: ViewModifier {
             }
             .onDisappear {
                 GCKeyboard.coalesced?.keyboardInput?.keyChangedHandler = nil
-                for button in Set(Self.mapping.values) { emulator.release(button) }
+                for button in emulator.keyboardButtons { emulator.setKeyboardButton(button, pressed: false) }
             }
     }
 
@@ -38,7 +38,7 @@ private struct KeyboardControls: ViewModifier {
         keyboard?.keyboardInput?.keyChangedHandler = { [emulator] _, _, keyCode, pressed in
             guard let button = Self.mapping[keyCode] else { return }
             Task { @MainActor in
-                if pressed { emulator.press(button) } else { emulator.release(button) }
+                emulator.setKeyboardButton(button, pressed: pressed)
             }
         }
     }
